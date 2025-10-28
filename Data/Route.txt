@@ -1,30 +1,30 @@
-R001,Da Nang - Hue,Da Nang,Hue,100,150
-R002,Da Nang - Quang Nam,Da Nang,Quang Nam,70,100
-R003,Da Nang - Quang Ngai,Da Nang,Quang Ngai,130,180
-R004,Da Nang - Ha Noi,Da Nang,Ha Noi,770,960
-R005,Da Nang - Sai Gon,Da Nang,Sai Gon,960,1200
-R006,Da Nang - Nha Trang,Da Nang,Nha Trang,530,720
-R007,Da Nang - Da Lat,Da Nang,Da Lat,630,840
-R008,Da Nang - Quy Nhon,Da Nang,Quy Nhon,320,420
-R009,Da Nang - Kon Tum,Da Nang,Kon Tum,300,420
-R010,Da Nang - Pleiku,Da Nang,Pleiku,270,360
-R011,Da Nang - Vinh,Da Nang,Vinh,450,600
-R012,Da Nang - Hai Phong,Da Nang,Hai Phong,780,1020
-R013,Da Nang - Dong Hoi,Da Nang,Dong Hoi,250,330
-R014,Da Nang - Thanh Hoa,Da Nang,Thanh Hoa,600,780
-R015,Da Nang - Phu Yen,Da Nang,Phu Yen,410,540
-R016,Da Nang - Can Tho,Da Nang,Can Tho,950,1200
-R017,Da Nang - Buon Ma Thuot,Da Nang,Buon Ma Thuot,500,720
-R018,Da Nang - Gia Lai,Da Nang,Gia Lai,360,480
-R019,Da Nang - Binh Dinh,Da Nang,Binh Dinh,340,420
-R020,Da Nang - Lam Dong,Da Nang,Lam Dong,650,900
-R021,Da Nang - Bac Ninh,Da Nang,Bac Ninh,770,960
-R022,Da Nang - Nam Dinh,Da Nang,Nam Dinh,740,900
-R023,Da Nang - Ha Tinh,Da Nang,Ha Tinh,390,540
-R024,Da Nang - Quang Binh,Da Nang,Quang Binh,290,420
-R025,Da Nang - Lao Bao,Da Nang,Lao Bao,250,330
-R026,Da Nang - Phan Rang,Da Nang,Phan Rang,590,780
-R027,Da Nang - Phan Thiet,Da Nang,Phan Thiet,790,990
-R028,Da Nang - Soc Trang,Da Nang,Soc Trang,1100,1320
-R029,Da Nang - Bac Giang,Da Nang,Bac Giang,780,960
-R030,Da Nang - Hai Duong,Da Nang,Hai Duong,760,940
+R001,Da Nang - Hue,100,150
+R002,Da Nang - Quang Nam,70,100
+R003,Da Nang - Quang Ngai,130,180
+R004,Da Nang - Ha Noi,770,960
+R005,Da Nang - Sai Gon,960,1200
+R006,Da Nang - Nha Trang,530,720
+R007,Da Nang - Da Lat,630,840
+R008,Da Nang - Quy Nhon,320,420
+R009,Da Nang - Kon Tum,300,420
+R010,Da Nang - Pleiku,270,360
+R011,Da Nang - Vinh,450,600
+R012,Da Nang - Hai Phong,780,1020
+R013,Da Nang - Dong Hoi,250,330
+R014,Da Nang - Thanh Hoa,600,780
+R015,Da Nang - Phu Yen,410,540
+R016,Da Nang - Can Tho,950,1200
+R017,Da Nang - Buon Ma Thuot,500,720
+R018,Da Nang - Gia Lai,360,480
+R019,Da Nang - Binh Dinh,340,420
+R020,Da Nang - Lam Dong,650,900
+R021,Da Nang - Bac Ninh,770,960
+R022,Da Nang - Nam Dinh,740,900
+R023,Da Nang - Ha Tinh,390,540
+R024,Da Nang - Quang Binh,290,420
+R025,Da Nang - Lao Bao,250,330
+R026,Da Nang - Phan Rang,590,780
+R027,Da Nang - Phan Thiet,790,990
+R028,Da Nang - Soc Trang,1100,1320
+R029,Da Nang - Bac Giang,780,960
+R030,Da Nang - Hai Duong,760,940

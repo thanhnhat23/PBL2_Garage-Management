@@ -1,42 +1,27 @@
+#pragma once
 #include <string>
 #include <vector>
 #include <iostream>
+#include "Ultil.h"
 using namespace std;
 
-class Bus {
+class Bus: public Ultil<Bus> {
     protected:
         string busId;
         string licensePlate;
         string brandId;
         int capacity;
         string type; // Bus type: VIP or Standard
-        bool active; // True = Full; False = Available
     public:
-        // Constructors
         Bus();
-        Bus(string id, string brand, string plate, string type, int cap, bool active);
+        Bus(string id, string brId, string plate, string t, int c);
 
-        // Input & Output
-        void input();
-        void display() const;
-
-        // File handling
-        static void loadFromFile(const string& filename, vector<Bus>& list);
-        static void saveToFile(const string& filename, const vector<Bus>& list);
+        void display() const override;
+        string toCSV() const override;
+        static Bus fromCSV(const string& line);
 
         // Getters
-        string getId() const;
-        string getBrandId() const;
-        string getPlate() const;
-        string getType() const;
-        int getCapacity() const;
-        bool isActive() const;
-
-        // Setters
-        void setId(string id);
-        void setBrandId(string brand);
-        void setPlate(string plate);
-        void setType(string type);
-        void setCapacity(int cap);
-        void setActive(bool act);
+        string getId() const { return busId; }
+        string getBrandId() const { return brandId; }
+        string getName() const { return licensePlate; } // for findByName
 };
