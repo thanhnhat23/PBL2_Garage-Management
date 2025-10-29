@@ -19,7 +19,7 @@ Ticket::Ticket() {
 
 // Full constructor
 Ticket::Ticket(string id, string trip, string bus, int seat, string name,
-               string phone, unsigned long p, string booked, string pay) {
+    string phone, unsigned long p, string booked, string pay) {
     ticketId = id;
     tripId = trip;
     busId = bus;
@@ -64,25 +64,38 @@ void Ticket::display() const {
 
 // Convert object → CSV
 string Ticket::toCSV() const {
-    return ticketId + "," + tripId + "," + busId + "," +
-           to_string(seatNo) + "," + passengerName + "," +
-           phoneNumber + "," + to_string(price) + "," +
-           bookedAt + "," + paymentMethod;
+    // Convert Ticket object to a CSV line
+    return
+        ticketId + "," +        // ticketId
+        tripId + "," +          // tripId
+        busId + "," +           // busId
+        to_string(seatNo) + "," +   // seatNo
+        passengerName + "," +       // passengerName
+        phoneNumber + "," +         // phoneNumber
+        to_string(price) + "," +    // price
+        bookedAt + "," +            // bookedAt
+        paymentMethod;              // paymentMethod
 }
 
 // Convert CSV → object
 Ticket Ticket::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, trip, bus, seatStr, name, phone, priceStr, booked, pay;
-    getline(ss, id, ',');
-    getline(ss, trip, ',');
-    getline(ss, bus, ',');
-    getline(ss, seatStr, ',');
-    getline(ss, name, ',');
-    getline(ss, phone, ',');
-    getline(ss, priceStr, ',');
-    getline(ss, booked, ',');
-    getline(ss, pay, ',');
-    return Ticket(id, trip, bus, stoi(seatStr), name, phone,
-                  stoul(priceStr), booked, pay);
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 9) return Ticket(); // skip invalid lines
+
+    return Ticket(
+        p[0], // ticketId
+        p[1], // tripId
+        p[2], // busId
+        stoi(p[3]), // seatNo
+        p[4], // passengerName
+        p[5], // phoneNumber
+        stoul(p[6]), // price
+        p[7], // bookedAt
+        p[8]  // paymentMethod
+    );
 }

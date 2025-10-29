@@ -34,21 +34,28 @@ void Trip::display() const {
 }
 
 string Trip::toCSV() const {
-    return tripId + "," + routeId + "," + busId + "," + driverId + "," +
-           departTime + "," + arrivalTime;
+    return 
+        tripId + "," + 
+        routeId + "," + 
+        busId + "," + 
+        driverId + "," +
+        departTime + "," + 
+        arrivalTime;
 }
 
 Trip Trip::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, route, bus, driver, depart, arrive;
-    getline(ss, id, ',');
-    getline(ss, route, ',');
-    getline(ss, bus, ',');
-    getline(ss, driver, ',');
-    getline(ss, depart, ',');
-    getline(ss, arrive, ',');
-    return Trip(id, route, bus, driver, depart, arrive);
-}
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 6) return Trip();
 
-string Trip::getId() const { return tripId; }
-string Trip::getName() const { return routeId; }
+    return Trip(
+        p[0], // tripId
+        p[3], // routeId
+        p[1], // busId
+        p[2], // driverId
+        p[4], // depart
+        p[5]  // arrival
+    );
+}

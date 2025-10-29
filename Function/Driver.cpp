@@ -6,13 +6,15 @@ using namespace std;
 
 Driver::Driver() {
     driverId = "";
+    busId = "";
     nameDriver = "";
     phoneDriver = "";
     experienceYears = 0;
 }
 
-Driver::Driver(string id, string name, string phone, int exp) {
+Driver::Driver(string id, string bus, string name, string phone, int exp) {
     driverId = id;
+    busId = bus;
     nameDriver = name;
     phoneDriver = phone;
     experienceYears = exp;
@@ -36,15 +38,28 @@ void Driver::display() const {
 }
 
 string Driver::toCSV() const {
-    return driverId + "," + nameDriver + "," + phoneDriver + "," + to_string(experienceYears);
+    return 
+        driverId + "," + 
+        busId + "," + 
+        nameDriver + "," + 
+        phoneDriver + "," + 
+        to_string(experienceYears);
 }
 
 Driver Driver::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, name, phone, expStr;
-    getline(ss, id, ',');
-    getline(ss, name, ',');
-    getline(ss, phone, ',');
-    getline(ss, expStr, ',');
-    return Driver(id, name, phone, stoi(expStr));
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 5) return Driver(); // skip invalid lines
+
+    return Driver(
+        p[0], // driverId
+        p[1], // name
+        p[2], // license
+        p[3], // busId
+        stoi(p[4]) // experience
+    );
 }

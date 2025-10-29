@@ -24,4 +24,6 @@ class Bus: public Ultil<Bus> {
         string getId() const { return busId; }
         string getBrandId() const { return brandId; }
         string getName() const { return licensePlate; } // for findByName
+        int getCapacity() const { return capacity; }
+        string getType() const { return type; }
 };

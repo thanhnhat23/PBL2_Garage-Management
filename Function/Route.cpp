@@ -8,14 +8,18 @@ using namespace std;
 Route::Route() {
     routeId = "";
     nameRoute = "";
+    startPoint = "";
+    endPoint = "";
     distanceKm = "";
     estDurationMin = "";
 }
 
 // Full constructor
-Route::Route(string id, string name, string dist, string dur) {
+Route::Route(string id, string name, string start, string end, string dist, string dur) {
     routeId = id;
     nameRoute = name;
+    startPoint = start;
+    endPoint = end;
     distanceKm = dist;
     estDurationMin = dur;
 }
@@ -41,17 +45,32 @@ void Route::display() const {
 
 // Convert object → CSV line
 string Route::toCSV() const {
-    return routeId + "," + nameRoute + "," + distanceKm + "," + estDurationMin;
+    return 
+        routeId + "," + 
+        nameRoute + "," + 
+        startPoint + "," + 
+        endPoint + "," + 
+        distanceKm + "," + 
+        estDurationMin;
 }
 
 // Convert CSV line → object
 Route Route::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, name, dist, dur;
-    getline(ss, id, ',');
-    getline(ss, name, ',');
-    getline(ss, dist, ',');
-    getline(ss, dur, ',');
-    return Route(id, name, dist, dur);
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 6) return Route(); // skip invalid lines
+
+    return Route(
+        p[0], // routeId
+        p[1], // routeName
+        p[2], // startPoint
+        p[3], // endPoint
+        p[4], // distanceKm
+        p[5]  // estDurationMin
+    );
 }
 

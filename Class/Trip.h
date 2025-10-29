@@ -27,6 +27,10 @@ class Trip {
         static Trip fromCSV(const string& line);
 
         // Getter
-        string getId() const;
-        string getName() const;
+        string getId() const { return tripId; };
+        string getBusId() const { return busId; }
+        string getName() const { return routeId; }
+        string getRouteId() const { return routeId; };
+        string getDepart() const { return departTime; };
+        string getArrival() const { return arrivalTime; };
 };

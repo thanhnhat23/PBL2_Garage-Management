@@ -26,17 +26,27 @@ void Seat::display() const {
          << setw(10) << (seatStatus ? "Full" : "Available") << endl;
 }
 
-// Convert object → CSV line
+// Convert object -> CSV line
 string Seat::toCSV() const {
-    return busId + "," + to_string(seatNo) + "," + to_string(seatStatus);
+    return 
+        busId + "," + 
+        to_string(seatNo) + "," + 
+        to_string(seatStatus);
 }
 
 // Convert CSV line → object
 Seat Seat::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string bus, seatStr, bookedStr;
-    getline(ss, bus, ',');
-    getline(ss, seatStr, ',');
-    getline(ss, bookedStr, ',');
-    return Seat(bus, stoi(seatStr), stoi(bookedStr));
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 3) return Seat(); // skip invalid lines
+
+    return Seat(
+        p[0], // busId
+        stoi(p[1]), // seatNo
+        stoi(p[2])  // seatStatus (0 or 1)
+    );
 }

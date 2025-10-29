@@ -26,15 +26,26 @@ void Brand::display() const {
 }
 
 string Brand::toCSV() const {
-    return brandId + "," + nameBrand + "," + hotline + "," + to_string(rating);
+    return 
+        brandId + "," + 
+        nameBrand + "," + 
+        hotline + "," + 
+        to_string(rating);
 }
 
 Brand Brand::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, name, phone, rateStr;
-    getline(ss, id, ',');
-    getline(ss, name, ',');
-    getline(ss, phone, ',');
-    getline(ss, rateStr, ',');
-    return Brand(id, name, phone, stof(rateStr));
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 4) return Brand(); // skip invalid lines
+
+    return Brand(
+        p[0], // brandId
+        p[1], // brandName
+        p[2], // address
+        stof(p[3]) // rating
+    );
 }

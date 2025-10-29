@@ -38,16 +38,27 @@ void Bus::display() const {
 }
 
 string Bus::toCSV() const {
-    return busId + "," + licensePlate + "," + type + "," + to_string(capacity);
+    return 
+        busId + "," + 
+        licensePlate + "," + 
+        type + "," + 
+        to_string(capacity);
 }
 
 Bus Bus::fromCSV(const string& line) {
+    vector<string> p;
+    string token;
     stringstream ss(line);
-    string id, brId, plate, t, capStr;
-    getline(ss, id, ',');
-    getline(ss, brId, ',');
-    getline(ss, plate, ',');
-    getline(ss, t, ',');
-    getline(ss, capStr, ',');
-    return Bus(id, brId, plate, t, stoi(capStr));
+
+    // split all fields
+    while (getline(ss, token, ',')) p.push_back(token);
+    if (p.size() < 5) return Bus(); // skip invalid lines
+
+    return Bus(
+        p[0], // busId
+        p[1], // name
+        p[2], // type
+        p[3], // brandId
+        stoi(p[4]) // seats
+    );
 }

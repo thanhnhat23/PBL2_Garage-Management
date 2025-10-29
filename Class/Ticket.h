@@ -36,5 +36,5 @@ class Ticket : public Ultil<Ticket> {
         unsigned long getPrice() const { return price; }
         string getBookedAt() const { return bookedAt; }
         string getPaymentMethod() const { return paymentMethod; }
-        string getName() const { return passengerName; } // dùng trong findByName
+        string getName() const { return passengerName; }
 };

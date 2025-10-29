@@ -1,8 +1,10 @@
 #include "../Class/Ultil.h"
 #include <sstream>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 using namespace std;
+namespace fs = std::filesystem;
 
 // loadFromFile
 template <typename T>
@@ -28,6 +30,46 @@ void Ultil<T>::saveToFile(const string& filename, const vector<T>& list) {
     ofstream file(filename);
     if (!file.is_open()) {
         cout << "Khong the ghi file: " << filename << endl;
+        return;
+    }
+
+    for (auto &item : list)
+        file << item.toCSV() << "\n";
+    file.close();
+}
+
+// loadFromFolder
+template <typename T>
+void Ultil<T>::loadFromFolder(const string& folderPath, vector<T>& list) {
+    list.clear();
+    if (!fs::exists(folderPath)) {
+        cout << "Thu muc khong ton tai: " << folderPath << endl;
+        return;
+    }
+
+    for (const auto& entry : fs::directory_iterator(folderPath)) {
+        if (entry.path().extension() == ".txt") {
+            ifstream file(entry.path());
+            if (!file.is_open()) continue;
+
+            string line;
+            while (getline(file, line)) {
+                if (line.empty() || line[0] == '#') continue;
+                list.push_back(T::fromCSV(line));
+            }
+            file.close();
+        }
+    }
+}
+
+// saveToFolder
+template <typename T>
+void Ultil<T>::saveToFolder(const string& folderPath, const vector<T>& list) {
+    fs::create_directories(folderPath);
+    string outFile = folderPath + "/AllData.txt";
+    ofstream file(outFile);
+    if (!file.is_open()) {
+        cout << "Khong the ghi vao: " << outFile << endl;
         return;
     }
 
