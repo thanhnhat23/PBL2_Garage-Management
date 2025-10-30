@@ -73,4 +73,3 @@ Route Route::fromCSV(const string& line) {
         p[5]  // estDurationMin
     );
 }
-
