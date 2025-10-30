@@ -50,7 +50,7 @@ All data are stored in `.txt` files under the `Data/` folder, making it lightwei
 
 ### Data Loading
 Each class (e.g., `Brand`, `Bus`, `Route`) includes a static function `fromCSV()` that converts a CSV line into an object instance.
-```
+```cpp
 vector<Brand> brands = loadData("Data/Brand.txt", Brand::fromCSV);
 ```
 The helper function `loadData()`:
@@ -60,7 +60,7 @@ The helper function `loadData()`:
 
 Menu System
 The main menu is built using an infinite loop:
-```
+```cpp
 while (true) {
     cout << "===== MAIN MENU =====\n";
     cout << "1. Manage Routes\n";
@@ -106,13 +106,12 @@ TK001,TR001,B001,2,Nguyen Van A,0912345678,150000,2025-10-29 20:00,Chuyen khoan
 - Formatted Output
   - iomanip (setw, left) for clean table-like display.
 
-🧑‍💻 Usage
-Compile
-```
+🧑‍💻 Usage Compile
+```powershell
 g++ main.cpp Class/*.cpp -o main
 ```
 Run
-```
+```powershell
 ./main
 ```
 Requirements: `C++17 or higher`
