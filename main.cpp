@@ -74,7 +74,7 @@ string getCurrentDateTime() {
 }
 
 // Menu 1
-void menuRoute(vector<Route> &routes) { // THAY ĐỔI: Nhận bằng tham chiếu (dấu &)
+void menuRoute(vector<Route> &routes) {
     string choice;
     while (true) {
         system("cls");
