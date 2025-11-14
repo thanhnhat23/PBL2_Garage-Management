@@ -207,17 +207,17 @@ void menuTicket(const vector<Ticket> &tickets, const vector<Trip> &trips,
 
         // Display formatted ticket line
         if (r && trip && bus) {
-            cout << setw(6) << left << tk.getId() << " "
-                 << setw(3) << tk.getSeatNo() << " "
-                 << setw(6) << bus->getType() << " "
-                 << setw(18) << tk.getPassengerName() << " "
-                 << setw(13) << tk.getPhoneNumber() << " "
-                 << setw(8) << to_string(tk.getPrice()) + "vnd" << " "
-                 << setw(14) << tk.getBookedAt() << " "
-                 << setw(12) << tk.getPaymentMethod() << " "
-                 << setw(17) << (r ? r->getStart() + " - " + r->getEnd() : "Unknown") << " "
-                 << setw(15) << (trip ? trip->getDepart() + " - " + trip->getArrival() : "Unknown") << " "
-                 << setw(10) << targetBrand->getName() << " "
+            cout << setw(6) << left << tk.getId() << "  "
+                 << setw(3) << tk.getSeatNo() << "  "
+                 << setw(6) << bus->getType() << "  "
+                 << setw(18) << tk.getPassengerName() << "  "
+                 << setw(13) << tk.getPhoneNumber() << "  "
+                 << setw(8) << to_string(tk.getPrice()) + "vnd" << "  "
+                 << setw(14) << tk.getBookedAt() << "  "
+                 << setw(12) << tk.getPaymentMethod() << "  "
+                 << setw(17) << (r ? r->getStart() + " - " + r->getEnd() : "Unknown") << "  "
+                 << setw(15) << (trip ? trip->getDepart() + " - " + trip->getArrival() : "Unknown") << "  "
+                 << setw(10) << targetBrand->getName() << "  "
                  << bus->getName() << "\n";
             count++;
         }
