@@ -145,7 +145,7 @@ static void menuRoute(vector<Route> &routes) {
         else if (sel == 1) { // Search
             ui::DrawPanel("SEARCH ROUTE");
             flushConsoleEvents();
-            cout << "Keyword (vd: 'da nang - hue' or 'hue'): ";
+            cout << "Keyword (e.g.: 'da nang - hue' or 'hue'): ";
             string key; getline(cin, key); key = toLowerStr(key);
 
             cout << "\n";
@@ -264,45 +264,46 @@ static void menuRoute(vector<Route> &routes) {
 
 // ---------------- BUS MENU ----------------
 static void menuBus(const vector<Brand> &brands, const vector<Bus> &buses,
-                    const vector<Driver> &drivers, const vector<Seat> &seats) {
+                      const vector<Driver> &drivers, const vector<Seat> &seats) {
     ui::DrawPanel("BUS MANAGEMENT");
     cout << "Brands:\n";
-    for (const auto &b : brands) cout << " - " << b.getName() << " (" << b.getId() << ")\n"; // :contentReference[oaicite:7]{index=7}
+    for (const auto &b : brands) cout << " - " << b.getName() << " (" << b.getId() << ")\n";
 
     cout << "\nEnter brand name: ";
     string input; flushConsoleEvents(); getline(cin, input);
     string key = toLowerStr(input);
 
     string brandId;
-    for (const auto &b : brands) if (toLowerStr(b.getName()) == key) brandId = b.getId(); // :contentReference[oaicite:8]{index=8}
+    for (const auto &b : brands) if (toLowerStr(b.getName()) == key) brandId = b.getId();
     if (brandId.empty()) { cout << "\nBrand not found.\n"; system("pause"); return; }
 
     vector<Bus> brandBuses;
-    for (const auto &bus : buses) if (bus.getBrandId() == brandId) brandBuses.push_back(bus); // :contentReference[oaicite:9]{index=9}
+    for (const auto &bus : buses) if (bus.getBrandId() == brandId) brandBuses.push_back(bus);
 
     cout << "\nBUSES OF BRAND:\n\n";
     if (brandBuses.empty()) { cout << "(No buses)\n\n"; system("pause"); return; }
-    ui::PrintBuses(brandBuses); // ID | Plate(getName) | Type | BrandId  :contentReference[oaicite:10]{index=10}
+    ui::PrintBuses(brandBuses);
 
     cout << "\nBus ID to view driver & seats: ";
     string id; getline(cin, id); id = toLowerStr(id);
 
     const Bus *chosen = nullptr;
-    for (const auto& b : brandBuses) if (toLowerStr(b.getId()) == id) { chosen = &b; break; } // :contentReference[oaicite:11]{index=11}
+    for (const auto& b : brandBuses) if (toLowerStr(b.getId()) == id) { chosen = &b; break; }
     if (!chosen) { cout << "\nBus not found.\n"; system("pause"); return; }
 
-    vector<Driver> ds; for (auto &d : drivers) if (d.getBus() == chosen->getId()) ds.push_back(d); // :contentReference[oaicite:12]{index=12}
+    vector<Driver> ds; for (auto &d : drivers) if (d.getBus() == chosen->getId()) ds.push_back(d);
     cout << "\n--- DRIVER INFO ---\n\n";
     if (ds.empty()) cout << "(No driver)\n";
-    else ui::PrintDrivers(ds); // Name/Phone/Exp/Bus  :contentReference[oaicite:13]{index=13}
+    else ui::PrintDrivers(ds);
 
-    vector<Seat> ss; for (auto &s : seats) if (s.getBusId() == chosen->getId()) ss.push_back(s); // :contentReference[oaicite:14]{index=14}
+    vector<Seat> ss; for (auto &s : seats) if (s.getBusId() == chosen->getId()) ss.push_back(s);
     cout << "\n--- SEAT LIST ---\n\n";
     if (ss.empty()) cout << "(No seat file)\n";
-    else ui::PrintSeats(ss);  // SeatNo / Status  :contentReference[oaicite:15]{index=15}
+    else ui::PrintSeats(ss);
 
     cout << "\n"; system("pause");
 }
+
 
 // ---------------- TICKET MENU ----------------
 static void menuTicket(const vector<Ticket> &tickets, const vector<Trip> &trips,
