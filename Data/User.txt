@@ -1,2 +1,3 @@
 U001,admin,admin123,ADMIN
 U002,user1,123456,USER
+U003,thanhnhat,23102006,USER
