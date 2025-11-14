@@ -108,7 +108,7 @@ TK001,TR001,B001,2,Nguyen Van A,0912345678,150000,2025-10-29 20:00,Chuyen khoan
 
 🧑‍💻 Usage Compile
 ```powershell
-g++ main.cpp Class/*.cpp -o main
+g++ main.cpp Function/*.cpp -o main
 ```
 Run
 ```powershell

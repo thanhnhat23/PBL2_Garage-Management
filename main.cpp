@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
+#include <limits>
+#include <chrono>
+#include <ctime>
 #include "Class/Brand.h"
 #include "Class/Bus.h"
 #include "Class/Driver.h"
@@ -13,6 +16,11 @@
 #include "Class/Ticket.h"
 #include "Class/Trip.h"
 using namespace std;
+
+// Clear input buffer
+void clearInputBuffer() {
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+}
 
 // Convert a string to lowercase
 string toLowerStr(string s) {
@@ -44,28 +52,168 @@ vector<T> loadData(const string &filePath, T (*loader)(const string &)) {
     return data;
 }
 
+// Get current date and time
+string getCurrentDateTime() {
+    auto now = chrono::system_clock::now();
+    time_t now_time = chrono::system_clock::to_time_t(now);
+    
+    tm ltm;
+    #ifdef _WIN32
+        localtime_s(&ltm, &now_time);
+    #else
+        ltm = *localtime(&now_time);
+    #endif
+
+    stringstream ss;
+    ss << (1900 + ltm.tm_year) << "-"
+       << setfill('0') << setw(2) << (1 + ltm.tm_mon) << "-"
+       << setfill('0') << setw(2) << ltm.tm_mday << " "
+       << setfill('0') << setw(2) << ltm.tm_hour << ":"
+       << setfill('0') << setw(2) << ltm.tm_min;
+    return ss.str();
+}
+
 // Menu 1
-void menuRoute(const vector<Route> &routes) {
-    system("cls");
-    cout << "===== ROUTE MANAGEMENT =====\n";
-    for (const auto &r : routes) r.display();
+void menuRoute(vector<Route> &routes) {
+    string choice;
+    while (true) {
+        system("cls");
+        cout << "===== ROUTE MANAGEMENT =====\n";
+        cout << "1. View All Routes\n";
+        cout << "2. Search Route\n";
+        cout << "3. Add New Route\n";
+        cout << "4. Update Route\n";
+        cout << "5. Delete Route\n";
+        cout << "0. Back to Main Menu\n";
+        cout << "============================\n";
+        cout << "Enter choice: ";
+        getline(cin, choice);
 
-    cout << "\nEnter route name or part (e.g. 'da nang - hue'): ";
-    string keyword;
-    getline(cin, keyword);
-    keyword = toLowerStr(keyword);
+        // 1 See all routes
+        if (choice == "1") {
+            system("cls");
+            cout << "--- All Available Routes ---\n";
+            for (const auto &r : routes) r.display();
+            system("pause");
+        }
+        // 2 Search route
+        else if (choice == "2") {
+            cout << "\nEnter route name or part (e.g. 'da nang - hue'): ";
+            string keyword;
+            getline(cin, keyword);
+            keyword = toLowerStr(keyword);
 
-    cout << "\n--- Search Results ---\n";
-    bool found = false;
-    for (const auto &r : routes) {
-        string name = toLowerStr(r.getName());
-        if (name.find(keyword) != string::npos) {
-            r.display();
-            found = true;
+            cout << "\n--- Search Results ---\n";
+            bool found = false;
+            for (const auto &r : routes) {
+                string name = toLowerStr(r.getName());
+                if (name.find(keyword) != string::npos) {
+                    r.display();
+                    found = true;
+                }
+            }
+            if (!found) cout << "No routes found!\n";
+            system("pause");
+        }
+        // 3 Add new route
+        else if (choice == "3") {
+            string name, start, end, dist, dur;
+            cout << "Enter Route Name (e.g., Da Nang - Hue): ";
+            getline(cin, name);
+            cout << "Enter Start Point: ";
+            getline(cin, start);
+            cout << "Enter End Point: ";
+            getline(cin, end);
+            cout << "Enter Distance (in km, e.g., 100): ";
+            getline(cin, dist);
+            cout << "Enter Duration (in minutes, e.g., 180): ";
+            getline(cin, dur);
+
+            // Generate new Route ID
+            string lastId = routes.empty() ? "R000" : routes.back().getId();
+            int nextIdNum = stoi(lastId.substr(1)) + 1;
+            stringstream ss;
+            ss << "R" << setw(3) << setfill('0') << nextIdNum;
+            string newId = ss.str();
+
+            Route newRoute(newId, name, start, end, dist, dur);
+            routes.push_back(newRoute);
+            Ultil<Route>::saveToFile("Data/Route.txt", routes);
+            cout << "Route " << newId << " added successfully!\n";
+            system("pause");
+        }
+        // 4 Update route
+        else if (choice == "4") {
+            cout << "Enter Route ID to update (e.g., R001): ";
+            string idToUpdate;
+            getline(cin, idToUpdate);
+
+            bool found = false;
+            for (auto &r : routes) {
+                if (toLowerStr(r.getId()) == toLowerStr(idToUpdate)) {
+                    found = true;
+                    cout << "Updating route: " << r.getName() << "\n";
+                    string name, start, end, dist, dur;
+                    
+                    cout << "Enter NEW Route Name (current: " << r.getName() << "): ";
+                    getline(cin, name);
+                    cout << "Enter NEW Start Point (current: " << r.getStart() << "): ";
+                    getline(cin, start);
+                    cout << "Enter NEW End Point (current: " << r.getEnd() << "): ";
+                    getline(cin, end);
+                    cout << "Enter NEW Distance (current: " << r.getDistance() << "): ";
+                    getline(cin, dist);
+                    cout << "Enter NEW Duration (current: " << r.getDuration() << "): ";
+                    getline(cin, dur);
+
+                    // Update route details
+                    r.setName(name);
+                    r.setStart(start);
+                    r.setEnd(end);
+                    r.setDistance(dist);
+                    r.setDuration(dur);
+
+                    Ultil<Route>::saveToFile("Data/Route.txt", routes);
+                    cout << "Route " << r.getId() << " updated!\n";
+                    break;
+                }
+            }
+            if (!found) cout << "Route ID not found!\n";
+            system("pause");
+        }
+        // 5 Delete route
+        else if (choice == "5") {
+            cout << "Enter Route ID to delete (e.g., R001): ";
+            string idToDelete;
+            getline(cin, idToDelete);
+
+            bool erased = false;
+            for (auto it = routes.begin(); it != routes.end(); ++it) {
+                if (toLowerStr(it->getId()) == toLowerStr(idToDelete)) {
+                    cout << "Deleting route: " << it->getName() << "\n";
+                    routes.erase(it);
+                    erased = true;
+                    break;
+                }
+            }
+
+            if (erased) {
+                Ultil<Route>::saveToFile("Data/Route.txt", routes);
+                cout << "Route deleted successfully!\n";
+            } else {
+                cout << "Route ID not found!\n";
+            }
+            system("pause");
+        }
+        // 0 Back to main menu
+        else if (choice == "0") {
+            break;
+        }
+        else {
+            cout << "Invalid option!\n";
+            system("pause");
         }
     }
-    if (!found) cout << "No routes found!\n";
-    system("pause");
 }
 
 // Menu 2: Manage Buses
@@ -230,7 +378,7 @@ void menuTicket(const vector<Ticket> &tickets, const vector<Trip> &trips,
 }
 
 // Menu 4: Booking / Cancel Ticket
-void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
+void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
                  const vector<Bus>& buses, vector<Seat>& seats,
                  vector<Ticket>& tickets) {
     system("cls");
@@ -241,7 +389,7 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
     string ch;
     getline(cin, ch);
 
-    // BOOKING
+    // 1 Book new ticket
     if (ch == "1") {
         string name, phone, from, to;
         int seatTypeChoice, payChoice;
@@ -255,12 +403,12 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         getline(cin, to);
         cout << "Seat type (1 = VIP, 0 = Standard): ";
         cin >> seatTypeChoice;
-        cin.ignore();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
         string seatType = seatTypeChoice == 1 ? "VIP" : "Standard";
 
         cout << "Payment method (1 = Chuyen khoan, 2 = Tien mat, 3 = ZaloPay): ";
         cin >> payChoice;
-        cin.ignore();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n'); 
         string payMethod;
         if (payChoice == 1) payMethod = "Chuyen khoan";
         else if (payChoice == 2) payMethod = "Tien mat";
@@ -268,10 +416,12 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
 
         // Find route
         string routeId = "";
+        const Route* bookedRoute = nullptr;
         for (const auto& r : routes)
             if (toLowerStr(r.getStart()) == toLowerStr(from) &&
                 toLowerStr(r.getEnd()) == toLowerStr(to)) {
                 routeId = r.getId();
+                bookedRoute = &r;
                 break;
             }
         if (routeId.empty()) {
@@ -293,10 +443,8 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
 
         cout << "\nAvailable trips:\n";
         for (auto& t : foundTrips) {
-            // Find bus for this trip and check seat type
             for (auto& b : buses)
                 if (b.getId() == t.getBusId() && toLowerStr(b.getType()) == toLowerStr(seatType)) {
-                    // check if bus has empty seat
                     string seatPath = "Data/Seat/" + b.getId() + ".txt";
                     ifstream fs(seatPath);
                     string line; bool hasEmpty = false;
@@ -316,7 +464,6 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         string tripId;
         getline(cin, tripId);
 
-        // Find chosen trip
         const Trip* chosen = nullptr;
         for (auto& t : trips)
             if (toLowerStr(t.getId()) == toLowerStr(tripId)) {
@@ -332,23 +479,63 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         string busId = chosen->getBusId();
         string seatPath = "Data/Seat/" + busId + ".txt";
 
-        // Show empty seats
-        vector<string> sLines;
+        vector<int> emptySeats; 
         ifstream fs(seatPath);
         string line;
         cout << "\nAvailable seats:\n";
         while (getline(fs, line)) {
             auto v = splitCSV(line);
-            if (v.size() >= 3 && v[2] == "0")
+            if (v.size() >= 3 && v[2] == "0") {
                 cout << v[1] << " ";
+                emptySeats.push_back(stoi(v[1])); 
+            }
         }
         fs.close();
 
         cout << "\nEnter seat number to book: ";
         string seatNoStr;
         getline(cin, seatNoStr);
+        int seatNoInt;
 
-        // Determine which TK00x file belongs to this trip
+        try {
+            seatNoInt = stoi(seatNoStr);
+        } catch (...) {
+            cout << "Invalid seat number! Booking failed.\n";
+            system("pause");
+            return; 
+        }
+
+        bool isValidSeat = false;
+        for (int emptySeat : emptySeats) {
+            if (emptySeat == seatNoInt) {
+                isValidSeat = true;
+                break;
+            }
+        }
+
+        if (!isValidSeat) {
+            cout << "Error: Seat " << seatNoStr << " is already booked or does not exist. Please try again.\n";
+            system("pause");
+            return; 
+        }
+
+        string currentBookedAt = getCurrentDateTime();
+        unsigned long price = 0; 
+
+        if (bookedRoute) {
+            try {
+                double distance = stod(bookedRoute->getDistance());
+                if (distance <= 50) {
+                    price = (unsigned long)(distance * 1000);
+                } else {
+                    price = (unsigned long)(50 * 1000 + (distance - 50) * 1500);
+                }
+            } catch (...) {
+                cout << "Warning: Could not calculate price. Using default.\n";
+            }
+        } 
+
+        // Find ticket file to save
         string tkFile = "";
         for (int i = 1; i <= 20; i++) {
             stringstream ss;
@@ -365,7 +552,7 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         }
         if (tkFile.empty()) tkFile = "Data/Ticket/TK001.txt";
 
-        // Append new ticket
+        // Generate new Ticket ID
         vector<string> lines;
         ifstream fin(tkFile);
         while (getline(fin, line)) if (!line.empty()) lines.push_back(line);
@@ -377,9 +564,10 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         nid << "TK" << setw(3) << setfill('0') << next;
         string newId = nid.str();
 
+        // Create new ticket line
         string newLine = newId + "," + chosen->getId() + "," + busId + "," +
-                         seatNoStr + "," + name + "," + phone +
-                         ",150000,2025-10-29 20:00," + payMethod;
+                 seatNoStr + "," + name + "," + phone + "," +
+                 to_string(price) + "," + currentBookedAt + "," + payMethod;
         lines.push_back(newLine);
         ofstream fout(tkFile, ios::trunc);
         for (auto& l : lines) fout << l << "\n";
@@ -398,12 +586,49 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
         ofstream fout2(seatPath, ios::trunc);
         for (auto& s : updated) fout2 << s << "\n";
         fout2.close();
+        
+        // Update vector 'seats' in memory
+        for (auto& s : seats) {
+            if (s.getBusId() == busId && s.getSeatNo() == seatNoInt) {
+                s.setStatus(true);
+                break;
+            }
+        }
+        // Update vector 'tickets' in memory
+        tickets.push_back(Ticket::fromCSV(newLine));
 
         cout << "\nTicket booked successfully and saved to " << tkFile << "!\n";
+        cout << "\n===== TICKET CONFIRMATION =====\n";
+        
+        const Bus* bookedBus = nullptr;
+        for (const auto& b : buses) {
+            if (b.getId() == busId) {
+                bookedBus = &b;
+                break;
+            }
+        }
+
+        cout << left << setw(15) << "Ticket ID:" << newId << "\n";
+        cout << left << setw(15) << "Passenger:" << name << " (" << phone << ")\n";
+
+        if (bookedRoute) {
+            cout << left << setw(15) << "Route:" << bookedRoute->getName() << " (" << bookedRoute->getStart() << " -> " << bookedRoute->getEnd() << ")\n";
+        }
+        if (bookedBus) {
+            cout << left << setw(15) << "Bus License:" << bookedBus->getName() << " (ID: " << busId << ")\n";
+        }
+        
+        cout << left << setw(15) << "Seat Number:" << seatNoStr << " (Type: " << seatType << ")\n";
+        cout << left << setw(15) << "Departure:" << chosen->getDepart() << "\n";
+        cout << left << setw(15) << "Arrival:" << chosen->getArrival() << "\n";
+        cout << left << setw(15) << "Price:" << price << " VND\n";
+        cout << left << setw(15) << "Booked At:" << currentBookedAt << "\n";
+        cout << left << setw(15) << "Payment:" << payMethod << "\n";
+        cout << "=================================\n";
+        
         system("pause");
     }
-
-    // CANCEL
+    // 2. CANCEL TICKET
     else if (ch == "2") {
         string name, phone;
         cout << "Enter passenger name to cancel: ";
@@ -413,6 +638,7 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
 
         bool found = false;
         string busId, seatNo;
+        int seatNoInt = -1;
         string tkPath = "";
 
         // Loop through all TK files
@@ -433,29 +659,38 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
                 auto v = splitCSV(ln);
                 if (v.size() < 9) continue;
 
-                // compare case-insensitive name + phone
                 if (toLowerStr(v[4]) == toLowerStr(name) &&
                     toLowerStr(v[5]) == toLowerStr(phone)) {
                     busId = v[2];
                     seatNo = v[3];
+                    seatNoInt = stoi(v[3]);
                     found = true;
                     tkPath = path;
-                    continue; // skip this line (delete)
+                    continue; 
                 }
                 newLines.push_back(ln);
             }
 
-            // If found, rewrite file immediately and stop searching
             if (found) {
+                // Update ticket file
                 ofstream fout(path, ios::trunc);
                 for (auto& l : newLines) fout << l << "\n";
                 fout.close();
+                
+                // 1 Update vector 'tickets' in memory
+                for (auto it = tickets.begin(); it != tickets.end(); ++it) {
+                    if (toLowerStr(it->getPassengerName()) == toLowerStr(name) &&
+                        toLowerStr(it->getPhoneNumber()) == toLowerStr(phone)) {
+                        tickets.erase(it);
+                        break; 
+                    }
+                }
                 break;
             }
         }
 
         if (found && !busId.empty()) {
-            // Update seat status to empty again
+            // Update seat file
             string seatPath = "Data/Seat/" + busId + ".txt";
             vector<string> updated;
             ifstream fs(seatPath);
@@ -471,6 +706,14 @@ void menuBooking(const vector<Route>& routes, const vector<Trip>& trips,
             ofstream fout2(seatPath, ios::trunc);
             for (auto& s : updated) fout2 << s << "\n";
             fout2.close();
+
+            // 2 Update vector 'seats' in memory
+            for (auto& s : seats) {
+                if (s.getBusId() == busId && s.getSeatNo() == seatNoInt) {
+                    s.setStatus(false);
+                    break;
+                }
+            }
 
             cout << "Ticket canceled successfully for passenger: "
                 << name << " (" << phone << ")\n"
