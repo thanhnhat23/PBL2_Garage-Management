@@ -9,6 +9,7 @@
 #include <limits>
 #include <chrono>
 #include <ctime>
+#include <filesystem>
 #ifdef _WIN32
   #include <windows.h>
 #endif
@@ -25,6 +26,7 @@
 #include "Class/ConsoleMenu.h"
 #include "Class/Table.h" 
 
+namespace fs = std::filesystem;
 using namespace std;
 
 // ---------- Helpers ----------
@@ -122,6 +124,79 @@ static void createAccount(vector<User>& users) {
          << "  Username: " << uname << "\n"
          << "  Role: USER\n\n";
     system("pause");
+}
+
+int timeToMinutes(string timeStr) {
+    if (timeStr.size() != 5 || timeStr[2] != ':') return -1;
+    try {
+        int h = stoi(timeStr.substr(0, 2));
+        int m = stoi(timeStr.substr(3, 2));
+        if (h < 0 || h > 23 || m < 0 || m > 59) return -1;
+        return h * 60 + m;
+    } catch(...) { return -1; }
+}
+
+string minutesToTime(int totalMinutes) {
+    int h = (totalMinutes / 60) % 24; 
+    int m = totalMinutes % 60;
+    stringstream ss;
+    ss << setfill('0') << setw(2) << h << ":" << setfill('0') << setw(2) << m;
+    return ss.str();
+}
+
+// Logic to check if a bus is busy during a new trip's time slot
+bool isBusBusy(const string& busId, int newStart, int newEnd, 
+               const string& newRouteId, 
+               const vector<Trip>& trips, 
+               const vector<Route>& routes, 
+               const string& currentTripId = "") {
+    
+    // 1 Find new route details
+    const Route* newR = nullptr;
+    for(const auto& r : routes) if(toLowerStr(r.getId()) == toLowerStr(newRouteId)) { newR = &r; break; }
+    if (!newR) return false; 
+
+    for (const auto& t : trips) {
+        if (toLowerStr(t.getId()) == toLowerStr(currentTripId)) continue; 
+
+        if (toLowerStr(t.getBusId()) == toLowerStr(busId)) {
+            int tStart = timeToMinutes(t.getDepart());
+            int tEnd = timeToMinutes(t.getArrival());
+            if (tStart == -1 || tEnd == -1) continue;
+
+            // 2 Find old route of the trip
+            const Route* oldR = nullptr;
+            for(const auto& r : routes) if(toLowerStr(r.getId()) == toLowerStr(t.getRouteId())) { oldR = &r; break; }
+            
+            if (!oldR) continue;
+
+            // Time buffer for bus to be busy after trip ends
+            int busyStart = tStart;
+            int busyEnd = tEnd + 30; 
+
+            if (toLowerStr(newR->getStart()) != toLowerStr(oldR->getEnd())) {
+
+                int tripDuration = tEnd - tStart;
+                busyEnd = tEnd + tripDuration + 30; 
+            }
+            // 3 Check for time overlap
+            if (max(newStart, busyStart) < min(newEnd, busyEnd)) {
+                string timeStr = minutesToTime(busyEnd);
+                cout << "\n[!] CONFLICT DETECTED for Bus " << busId << ":\n";
+                cout << "    - Occupied by Trip: " << t.getId() << " (" << t.getDepart() << " - " << t.getArrival() << ")\n";
+                cout << "    - Route: " << oldR->getName() << " (" << oldR->getStart() << " -> " << oldR->getEnd() << ")\n";
+                
+                if (busyEnd > tEnd + 30) {
+                     cout << "    - Reason: Bus needs time to return to '" << newR->getStart() << "'.\n";
+                     cout << "    - Bus available at: " << timeStr << " (including return trip + 30m break).\n";
+                } else {
+                     cout << "    - Bus available at: " << timeStr << " (after arrival + 30m break).\n";
+                }
+                return true; 
+            }
+        }
+    }
+    return false;
 }
 
 // ---------------- ROUTE MENU ----------------
@@ -263,110 +338,329 @@ static void menuRoute(vector<Route> &routes) {
 }
 
 // ---------------- BUS MENU ----------------
-static void menuBus(const vector<Brand> &brands, const vector<Bus> &buses,
-                      const vector<Driver> &drivers, const vector<Seat> &seats) {
-    ui::DrawPanel("BUS MANAGEMENT");
-    cout << "Brands:\n";
-    for (const auto &b : brands) cout << " - " << b.getName() << " (" << b.getId() << ")\n";
+static void menuBus(const vector<Brand> &brands, vector<Bus> &buses,
+                    vector<Driver> &drivers, vector<Seat> &seats) {
+    while (true) {
+        int sel = ConsoleMenu::pick("BUS MANAGEMENT", {
+            "View Buses by Brand",
+            "Search Bus",
+            "Add New Bus",
+            "Delete Bus",
+            "Back"
+        });
 
-    cout << "\nEnter brand name: ";
-    string input; flushConsoleEvents(); getline(cin, input);
-    string key = toLowerStr(input);
+        if (sel == -1 || sel == 4) break;
 
-    string brandId;
-    for (const auto &b : brands) if (toLowerStr(b.getName()) == key) brandId = b.getId();
-    if (brandId.empty()) { cout << "\nBrand not found.\n"; system("pause"); return; }
+        // 1 View Buses by Brand
+        if (sel == 0) {
+            ui::DrawPanel("VIEW BUSES BY BRAND");
+            cout << "Available Brands:\n";
+            for (const auto &b : brands) 
+                cout << " [" << b.getId() << "] " << b.getName() << "\n";
+            
+            cout << "\nEnter Brand ID to filter (e.g. BR01): ";
+            string inputId; 
+            flushConsoleEvents(); 
+            getline(cin, inputId);
+            string key = toLowerStr(inputId);
+            
+            string targetBrandId = "";
+            for (const auto &b : brands) {
+                if (toLowerStr(b.getId()) == key) {
+                    targetBrandId = b.getId();
+                    break;
+                }
+            }
+            
+            if (targetBrandId.empty()) { 
+                cout << "\nBrand ID not found.\n"; 
+                system("pause"); 
+                continue; 
+            }
 
-    vector<Bus> brandBuses;
-    for (const auto &bus : buses) if (bus.getBrandId() == brandId) brandBuses.push_back(bus);
+            vector<Bus> brandBuses;
+            for (const auto &bus : buses) 
+                if (bus.getBrandId() == targetBrandId) brandBuses.push_back(bus);
+            
+            cout << "\n";
+            if (brandBuses.empty()) cout << "(No buses found for this brand)\n";
+            else ui::PrintBuses(brandBuses);
+            
+            cout << "\n"; system("pause");
+        }
 
-    cout << "\nBUSES OF BRAND:\n\n";
-    if (brandBuses.empty()) { cout << "(No buses)\n\n"; system("pause"); return; }
-    ui::PrintBuses(brandBuses);
+        // 2 Search Bus Details
+        else if (sel == 1) {
+            ui::DrawPanel("SEARCH BUS DETAILS");
+            cout << "Enter Bus ID (e.g. B001): ";
+            string id; flushConsoleEvents(); getline(cin, id); id = toLowerStr(id);
 
-    cout << "\nBus ID to view driver & seats: ";
-    string id; getline(cin, id); id = toLowerStr(id);
+            const Bus *chosen = nullptr;
+            for (const auto& b : buses) 
+                if (toLowerStr(b.getId()) == id) { chosen = &b; break; }
+            
+            if (!chosen) { cout << "\nBus not found.\n"; system("pause"); continue; }
 
-    const Bus *chosen = nullptr;
-    for (const auto& b : brandBuses) if (toLowerStr(b.getId()) == id) { chosen = &b; break; }
-    if (!chosen) { cout << "\nBus not found.\n"; system("pause"); return; }
+            vector<Bus> temp = { *chosen };
+            cout << "\n[ BUS INFO ]\n";
+            ui::PrintBuses(temp);
 
-    vector<Driver> ds; for (auto &d : drivers) if (d.getBus() == chosen->getId()) ds.push_back(d);
-    cout << "\n--- DRIVER INFO ---\n\n";
-    if (ds.empty()) cout << "(No driver)\n";
-    else ui::PrintDrivers(ds);
+            vector<Driver> ds; 
+            for (auto &d : drivers) 
+                if (d.getBus() == chosen->getId()) ds.push_back(d);
+            
+            cout << "\n[ DRIVER ]\n";
+            if (ds.empty()) cout << "(No driver assigned)\n"; 
+            else ui::PrintDrivers(ds);
 
-    vector<Seat> ss; for (auto &s : seats) if (s.getBusId() == chosen->getId()) ss.push_back(s);
-    cout << "\n--- SEAT LIST ---\n\n";
-    if (ss.empty()) cout << "(No seat file)\n";
-    else ui::PrintSeats(ss);
+            vector<Seat> ss; 
+            for (auto &s : seats) 
+                if (s.getBusId() == chosen->getId()) ss.push_back(s);
+            
+            cout << "\n[ SEATS ]\n";
+            if (ss.empty()) cout << "(No seat data found)\n"; 
+            else ui::PrintSeats(ss);
+            
+            cout << "\n"; system("pause");
+        }
 
-    cout << "\n"; system("pause");
+        // 3 Add New Bus
+        else if (sel == 2) {
+            ui::DrawPanel("ADD NEW BUS");
+            flushConsoleEvents();
+            string brandId, plate, type, drvName, drvPhone;
+            int cap = 0, exp = 0;
+
+            cout << "Available Brands:\n";
+            for (const auto &b : brands) cout << " " << b.getId() << ": " << b.getName() << "\n";
+            
+            while(true) {
+                cout << "Enter Brand ID: "; 
+                string inputId; getline(cin, inputId);
+                bool found = false; 
+                for(const auto& b : brands) {
+                    if(toLowerStr(b.getId()) == toLowerStr(inputId)) {
+                        brandId = b.getId(); 
+                        found = true;
+                        break;
+                    }
+                }
+                if(found) break; 
+                cout << "Invalid Brand ID. Please try again.\n";
+            }
+
+            cout << "License Plate (e.g. 43A-99999): "; getline(cin, plate);
+            
+            while(true) {
+                cout << "Type (VIP/Standard): "; getline(cin, type);
+                if(toLowerStr(type)=="vip" || toLowerStr(type)=="standard") {
+                    type = (toLowerStr(type) == "vip" ? "VIP" : "Standard");
+                    break;
+                }
+                cout << "Type must be 'VIP' or 'Standard'.\n";
+            }
+
+            while(true) {
+                cout << "Capacity (e.g. 30): "; 
+                string s; getline(cin, s);
+                try { cap = stoi(s); if(cap > 0) break; } catch(...) {}
+                cout << "Invalid capacity. Must be a number > 0.\n";
+            }
+            
+            cout << "\n-- Driver Info --\n";
+            cout << "Driver Name : "; getline(cin, drvName);
+            cout << "Driver Phone: "; getline(cin, drvPhone);
+            
+            while(true) {
+                cout << "Experience (years): "; 
+                string s; getline(cin, s);
+                try { exp = stoi(s); break; } catch(...) {}
+                cout << "Invalid number.\n";
+            }
+
+            // Generate IDs
+            string lastBusId = buses.empty() ? "B000" : buses.back().getId();
+            int nextB = 0; try { nextB = stoi(lastBusId.substr(1)) + 1; } catch(...) {}
+            stringstream sb; sb << "B" << setw(3) << setfill('0') << nextB;
+            string bid = sb.str();
+
+            string lastDrvId = drivers.empty() ? "D000" : drivers.back().getId();
+            int nextD = 0; try { nextD = stoi(lastDrvId.substr(1)) + 1; } catch(...) {}
+            stringstream sd; sd << "D" << setw(3) << setfill('0') << nextD;
+            string did = sd.str();
+
+            // Add to Memory
+            buses.push_back(Bus(bid, brandId, plate, type, cap));
+            drivers.push_back(Driver(did, bid, drvName, drvPhone, exp));
+
+            // Create Seat File
+            string sPath = "Data/Seat/" + bid + ".txt";
+            ofstream f(sPath);
+            if (f.is_open()) {
+                for(int i=1; i<=cap; ++i) {
+                    f << bid << "," << i << ",0\n";
+                    seats.push_back(Seat(bid, i, false));
+                }
+                f.close();
+            }
+
+            // Save to Disk
+            Ultil<Bus>::saveToFile("Data/Bus.txt", buses);
+            Ultil<Driver>::saveToFile("Data/Driver.txt", drivers);
+
+            cout << "\nSuccess! Created Bus " << bid << " (" << plate << ") and Driver " << did << ".\n";
+            system("pause");
+        }
+
+        // 4. Delete Bus
+        else if (sel == 3) {
+            ui::DrawPanel("DELETE BUS");
+            flushConsoleEvents();
+            cout << "Enter Bus ID to delete: "; string id; getline(cin, id); id = toLowerStr(id);
+
+            auto it = find_if(buses.begin(), buses.end(), 
+                [&](const Bus& b){ return toLowerStr(b.getId()) == id; });
+            
+            if (it == buses.end()) { cout << "Bus not found.\n"; system("pause"); continue; }
+
+            string targetId = it->getId();
+            cout << "Deleting Bus " << targetId << " (" << it->getName() << ")...\n";
+            
+            // Remove Bus
+            buses.erase(it);
+            
+            // Remove Drivers
+            auto itD = remove_if(drivers.begin(), drivers.end(), 
+                [&](const Driver& d){ return toLowerStr(d.getBus()) == toLowerStr(targetId); });
+            drivers.erase(itD, drivers.end());
+
+            // Remove Seats (Memory)
+            auto itS = remove_if(seats.begin(), seats.end(), 
+                [&](const Seat& s){ return toLowerStr(s.getBusId()) == toLowerStr(targetId); });
+            seats.erase(itS, seats.end());
+
+            // Remove Seat File (Disk)
+            string sPath = "Data/Seat/" + targetId + ".txt";
+            if (fs::exists(sPath)) fs::remove(sPath);
+
+            // Save Changes
+            Ultil<Bus>::saveToFile("Data/Bus.txt", buses);
+            Ultil<Driver>::saveToFile("Data/Driver.txt", drivers);
+
+            cout << "Deleted successfully.\n";
+            system("pause");
+        }
+    }
 }
 
 
 // ---------------- TICKET MENU ----------------
 static void menuTicket(const vector<Ticket> &tickets, const vector<Trip> &trips,
-                         const vector<Route> &routes, const vector<Bus> &buses,
-                         const vector<Brand> &brands) {
-    
-    ui::DrawPanel("TICKET MANAGEMENT");
-    cout << "Available Brands:\n";
-    for (const auto &b : brands)
-        cout << " - " << b.getName() << " (" << b.getId() << ")\n";
-
-    cout << "\nEnter brand name to filter: ";
-    string name; 
-    flushConsoleEvents(); 
-    getline(cin, name);
-
-    const Brand *br = nullptr;
-    for (const auto& x : brands) if (toLowerStr(x.getName()) == toLowerStr(name)) { br = &x; break; }
-    if (!br) { cout << "\nBrand not found.\n"; system("pause"); return; }
-
-    vector<string> busIds;
-    for (const auto& b : buses) if (b.getBrandId() == br->getId()) busIds.push_back(b.getId());
-    if (busIds.empty()) { cout << "\nNo buses for this brand.\n"; system("pause"); return; }
-
+                       const vector<Route> &routes, const vector<Bus> &buses,
+                       const vector<Brand> &brands) {
     while (true) {
-        string panelTitle = "BRAND: " + br->getName();
-        int sel = ConsoleMenu::pick(panelTitle,
-                                    { "View VIP Tickets", "View Standard Tickets", "Back" });
+        // Main Ticket Menu using ConsoleMenu
+        int sel = ConsoleMenu::pick("TICKET MANAGEMENT", {
+            "View Tickets by Brand",
+            "Back"
+        });
 
-        if (sel == -1 || sel == 2) break;
+        if (sel == -1 || sel == 1) break; // Back or Error
 
-        string seatTypeToFilter = (sel == 0 ? "VIP" : "Standard");
-        
-        string resultTitle = "TICKETS: " + br->getName() + " (" + seatTypeToFilter + ")";
-        ui::DrawPanel(resultTitle);
+        if (sel == 0) { // View Tickets by Brand
+            ui::DrawPanel("FILTER TICKETS");
+            cout << "Available Brands:\n";
+            
+            // Show ID first for easier lookup
+            for (const auto &b : brands) 
+                cout << " [" << b.getId() << "] " << b.getName() << "\n";
 
-        vector<Ticket> tkFiltered;
-        for (const auto &tk : tickets) {
-            if (find(busIds.begin(), busIds.end(), tk.getBusId()) == busIds.end())
+            // Ask for Brand ID instead of Name
+            cout << "\nEnter Brand ID to filter (e.g. BR01): ";
+            string inputId; 
+            flushConsoleEvents(); 
+            getline(cin, inputId);
+            string key = toLowerStr(inputId);
+
+            const Brand *targetBrand = nullptr;
+            for (const auto& br : brands) {
+                // Compare by ID
+                if (toLowerStr(br.getId()) == key) { 
+                    targetBrand = &br; 
+                    break; 
+                }
+            }
+            
+            if (!targetBrand) { 
+                cout << "\nBrand ID not found.\n"; 
+                system("pause"); 
+                continue; 
+            }
+
+            // Filter Buses belonging to this Brand
+            vector<string> brandBusIds;
+            for (const auto& b : buses)
+                if (b.getBrandId() == targetBrand->getId()) brandBusIds.push_back(b.getId());
+
+            if (brandBusIds.empty()) {
+                cout << "\nNo buses found for this brand.\n";
+                system("pause");
                 continue;
+            }
 
-            const Bus *bus = nullptr;
-            for (const auto &b : buses)
-                if (b.getId() == tk.getBusId()) { bus = &b; break; }
+            // Sub-menu: Select Ticket Type (VIP / Standard)
+            while (true) {
+                string subTitle = "BRAND: " + targetBrand->getName();
+                int subSel = ConsoleMenu::pick(subTitle, {
+                    "View VIP Tickets",
+                    "View Standard Tickets",
+                    "Back"
+                });
 
-            if (bus && toLowerStr(bus->getType()) == toLowerStr(seatTypeToFilter)) {
-                tkFiltered.push_back(tk);
+                if (subSel == -1 || subSel == 2) break;
+
+                string typeFilter = (subSel == 0 ? "VIP" : "Standard");
+                
+                // Filter Tickets
+                vector<Ticket> filteredTickets;
+                for (const auto &tk : tickets) {
+                    // 1. Check if ticket belongs to one of the Brand's buses
+                    bool isBrandBus = false;
+                    for(const string& bid : brandBusIds) {
+                        if(bid == tk.getBusId()) { 
+                            isBrandBus = true; 
+                            break; 
+                        }
+                    }
+                    if (!isBrandBus) continue;
+
+                    // 2. Check if Bus Type matches the selected filter
+                    for (const auto &b : buses) {
+                        if (b.getId() == tk.getBusId()) {
+                            if (toLowerStr(b.getType()) == toLowerStr(typeFilter)) {
+                                filteredTickets.push_back(tk);
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Display Results using Table UI
+                ui::DrawPanel(typeFilter + " TICKETS: " + targetBrand->getName());
+                
+                if (filteredTickets.empty()) {
+                    cout << "(No " << typeFilter << " tickets found)\n";
+                } else {
+                    // Call pretty print function from Table.cpp
+                    ui::PrintTickets(filteredTickets, trips, routes, buses);
+                }
+                
+                cout << "\n"; 
+                system("pause");
             }
         }
-        
-        cout << "\nShowing all " << seatTypeToFilter << " tickets for brand: " << br->getName() << "\n\n";
-
-        if (tkFiltered.empty()) {
-            cout << "(No " << seatTypeToFilter << " tickets found for this brand)\n";
-        } else {
-            ui::PrintTickets(tkFiltered, trips, routes, buses);
-        }
-
-        cout << "\n"; 
-        system("pause");
     }
 }
-
 // ---------------- BOOK / CANCEL ----------------
 static void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
                          const vector<Bus>& buses, vector<Seat>& seats,
@@ -649,6 +943,166 @@ static void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
         cout << "\n"; system("pause");
     }
 }
+// ---------------- TRIP MENU ----------------
+static void menuTrip(vector<Trip>& trips, const vector<Route>& routes, 
+                     const vector<Bus>& buses, const vector<Driver>& drivers) {
+    while(true) {
+        int sel = ConsoleMenu::pick("TRIP MANAGEMENT", {
+            "View All Trips",
+            "Add New Trip (Smart Schedule)",
+            "Update Trip",
+            "Delete Trip",
+            "Back"
+        });
+        if (sel == -1 || sel == 4) break;
+
+        // 1 View
+        if (sel == 0) { 
+            ui::DrawPanel("ALL TRIPS");
+            cout << left << setw(8) << "ID" << setw(8) << "Route" << setw(8) << "Bus" 
+                 << setw(20) << "Driver" << setw(10) << "Depart" << setw(10) << "Arrive" << "\n";
+            cout << string(70, '-') << "\n";
+            for(const auto& t : trips) {
+                 string drvName = "Unknown"; 
+                 for(const auto& d : drivers) if(d.getId() == t.getDriverId()) { drvName = d.getName(); break; }
+                 cout << left << setw(8) << t.getId() << setw(8) << t.getRouteId() << setw(8) << t.getBusId()
+                 << setw(20) << drvName << setw(10) << t.getDepart() << setw(10) << t.getArrival() << "\n";
+            }
+            cout << "\n"; system("pause");
+        }
+
+        // 2 Add New Trip
+        else if (sel == 1) { 
+            ui::DrawPanel("ADD NEW TRIP");
+            flushConsoleEvents();
+            string rid, bid, dep, arr;
+            const Route* selectedRoute = nullptr;
+
+            // A Select Route
+            cout << "Routes:\n"; for(const auto& r:routes) cout << " [" << r.getId() << "] " << r.getName() << "\n";
+            while(true) {
+                cout << "Enter Route ID: "; getline(cin, rid);
+                for(const auto&r:routes) if(toLowerStr(r.getId())==toLowerStr(rid)) { selectedRoute = &r; break; }
+                if(selectedRoute) break; 
+                cout << "Error: Invalid Route ID.\n";
+            }
+
+            // B Select Bus
+            cout << "\nBuses:\n"; for(const auto& b:buses) cout << " [" << b.getId() << "] " << b.getType() << " (" << b.getName() << ")\n";
+            while(true) {
+                cout << "Enter Bus ID: "; getline(cin, bid);
+                bool ok=false; for(const auto&b:buses) if(toLowerStr(b.getId())==toLowerStr(bid)) ok=true;
+                if(ok) break; 
+                cout << "Error: Invalid Bus ID.\n";
+            }
+
+            // C Departure Time
+            int depMin = 0;
+            while(true) {
+                cout << "Departure Time (HH:MM): "; getline(cin, dep);
+                depMin = timeToMinutes(dep);
+                if (depMin != -1) break;
+                cout << "Error: Invalid time format.\n";
+            }
+
+            // D Calc Arrival
+            int duration = 0; try { duration = stoi(selectedRoute->getDuration()); } catch(...) { duration = 60; }
+            int arrMin = depMin + duration;
+            arr = minutesToTime(arrMin);
+            cout << "-> Estimated Arrival: " << arr << " (Duration: " << duration << "m)\n";
+
+            if (isBusBusy(bid, depMin, arrMin, rid, trips, routes)) { 
+                cout << "\nPlease choose another bus or time.\n";
+                system("pause");
+                continue; 
+            }
+
+            // E Auto Driver
+            string did = "Unknown";
+            for(const auto& d: drivers) if(toLowerStr(d.getBus()) == toLowerStr(bid)) { did = d.getId(); break; }
+
+            // F Save
+            string lastId = "T000"; 
+            if (!trips.empty()) lastId = trips.back().getId();
+            int next = 0; try { next = stoi(lastId.substr(1)) + 1; } catch(...) {}
+            stringstream ss; ss << "T" << setw(3) << setfill('0') << next;
+            
+            Trip t(ss.str(), rid, bid, did, dep, arr);
+            trips.push_back(t);
+            Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
+            
+            cout << "\nSuccess! Trip " << ss.str() << " created.\n";
+            system("pause");
+        }
+
+        // 3 Update Trip
+        else if (sel == 2) { 
+            ui::DrawPanel("UPDATE TRIP");
+            flushConsoleEvents();
+            cout << "Enter Trip ID to update: "; string inputId; getline(cin, inputId);
+            
+            Trip* tripToUpdate = nullptr;
+            for(auto &t : trips) if(toLowerStr(t.getId()) == toLowerStr(inputId)) { tripToUpdate = &t; break; }
+
+            if (!tripToUpdate) { cout << "Trip ID not found.\n"; system("pause"); continue; }
+
+            cout << "Updating " << tripToUpdate->getId() << "...\n";
+            
+            string rid, bid, dep;
+            cout << "New Route ID [" << tripToUpdate->getRouteId() << "]: "; getline(cin, rid);
+            if(rid.empty()) rid = tripToUpdate->getRouteId();
+
+            cout << "New Bus ID   [" << tripToUpdate->getBusId() << "]: "; getline(cin, bid);
+            if(bid.empty()) bid = tripToUpdate->getBusId();
+
+            cout << "New Depart   [" << tripToUpdate->getDepart() << "]: "; getline(cin, dep);
+            if(dep.empty()) dep = tripToUpdate->getDepart();
+
+            const Route* rObj = nullptr;
+            for(const auto& r : routes) if(toLowerStr(r.getId()) == toLowerStr(rid)) { rObj = &r; break; }
+            
+            if(!rObj) { cout << "Error: Route ID not valid.\n"; system("pause"); continue; }
+            
+            int depMin = timeToMinutes(dep);
+            if(depMin == -1) { cout << "Error: Invalid time format.\n"; system("pause"); continue; }
+            
+            int duration = 0; try { duration = stoi(rObj->getDuration()); } catch(...) {}
+            int arrMin = depMin + duration;
+            string newArr = minutesToTime(arrMin);
+            if (isBusBusy(bid, depMin, arrMin, rid, trips, routes, tripToUpdate->getId())) {
+                cout << "\nUpdate failed due to conflict.\n";
+                system("pause");
+                continue;
+            }
+
+            string newDid = "Unknown";
+            for(const auto& d: drivers) if(toLowerStr(d.getBus()) == toLowerStr(bid)) { newDid = d.getId(); break; }
+
+            *tripToUpdate = Trip(tripToUpdate->getId(), rid, bid, newDid, dep, newArr);
+
+            Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
+            cout << "\nTrip updated! New Arrival: " << newArr << "\n";
+            system("pause");
+        }
+
+        // 4 Delete Trip
+        else if (sel == 3) {
+            ui::DrawPanel("DELETE TRIP");
+            flushConsoleEvents();
+            cout << "Trip ID: "; string id; getline(cin, id);
+
+            auto it = remove_if(trips.begin(), trips.end(), [&](const Trip& t){ return toLowerStr(t.getId()) == toLowerStr(id); });
+            if (it != trips.end()) {
+                trips.erase(it, trips.end());
+                Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
+                cout << "Deleted.\n";
+            } else {
+                cout << "Not found.\n";
+            }
+            system("pause");
+        }
+    }
+}
 
 // ---------------- LOGIN & ROLE MENUS ----------------
 static bool loginFlow(AuthManager& auth, vector<User>& users) {
@@ -680,6 +1134,7 @@ static void adminMenu(AuthManager& auth,
         int sel = ConsoleMenu::pick("MAIN MENU (ADMIN)", {
             "Manage Routes",
             "Manage Buses",
+            "Manage Trips (Link Route & Bus)",
             "Manage Tickets",
             "Booking / Cancel",
             "Logout",
@@ -688,10 +1143,11 @@ static void adminMenu(AuthManager& auth,
         if (sel == -1) continue;
         if (sel == 0)      menuRoute(routes);
         else if (sel == 1) menuBus(brands, buses, drivers, seats);
-        else if (sel == 2) menuTicket(tickets, trips, routes, buses, brands);
-        else if (sel == 3) menuBooking(routes, trips, buses, seats, tickets);
-        else if (sel == 4) { auth.logout(); break; }
-        else if (sel == 5) { auth.logout(); exit(0); }
+        else if (sel == 2) menuTrip(trips, routes, buses, drivers);
+        else if (sel == 3) menuTicket(tickets, trips, routes, buses, brands);
+        else if (sel == 4) menuBooking(routes, trips, buses, seats, tickets);
+        else if (sel == 5) { auth.logout(); break; }
+        else if (sel == 6) { auth.logout(); exit(0); }
     }
 }
 static void userMenu(AuthManager& auth,

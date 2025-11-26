@@ -31,6 +31,7 @@ class Trip {
         string getBusId() const { return busId; }
         string getName() const { return routeId; }
         string getRouteId() const { return routeId; };
+        string getDriverId() const { return driverId; }
         string getDepart() const { return departTime; };
         string getArrival() const { return arrivalTime; };
 };
