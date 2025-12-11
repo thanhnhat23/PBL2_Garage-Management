@@ -40,6 +40,7 @@ void Bus::display() const {
 string Bus::toCSV() const {
     return 
         busId + "," + 
+        brandId + "," +
         licensePlate + "," + 
         type + "," + 
         to_string(capacity);
