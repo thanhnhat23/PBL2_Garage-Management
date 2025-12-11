@@ -18,6 +18,23 @@ using namespace std;
 #ifdef _WIN32
 struct Rect { SHORT x, y, w, h; };
 
+static int fallbackPick(const std::string& title,
+                       const std::vector<std::string>& options,
+                       DWORD oldMode,
+                       HANDLE hin) {
+    // restore mode before textual prompt
+    SetConsoleMode(hin, oldMode);
+    FlushConsoleInputBuffer(hin);
+    std::cout << "== " << title << " ==\n";
+    for (size_t i = 0; i < options.size(); ++i) {
+        std::cout << " " << (i+1) << ") " << options[i] << "\n";
+    }
+    std::cout << "Choose (1.." << options.size() << ") or 0 to exit: ";
+    int n; std::cin >> n; std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    if (n <= 0 || n > (int)options.size()) return -1;
+    return n-1;
+}
+
 static void put(HANDLE out, SHORT x, SHORT y, const string& s) {
     COORD c{ x, y };
     SetConsoleCursorPosition(out, c);
@@ -120,7 +137,7 @@ int ConsoleMenu::pick(const std::string& title,
     size_t maxLabel = title.size();
     for (auto& s : options) maxLabel = max(maxLabel, s.size());
     SHORT frameW = (SHORT)max<int>((int)maxLabel + 8, 38);
-    SHORT X = 4, Y = 1;
+    SHORT X = 2, Y = 1;
 
     drawFrame(hout, X, Y, frameW, title);
 
@@ -133,7 +150,6 @@ int ConsoleMenu::pick(const std::string& title,
     for (size_t i = 0; i < options.size(); ++i) {
         Rect r{ (SHORT)(X + 2), (SHORT)(startY + (SHORT)i * (btnH + gapY)), btnW, btnH };
         rects.push_back(r);
-        drawButton(hout, r, options[i], false);
     }
 
     // ----- INFO PANEL -----
@@ -142,6 +158,22 @@ int ConsoleMenu::pick(const std::string& title,
     SHORT infoX = X + frameW + 3;
     SHORT infoY = Y;
     SHORT infoH = max<SHORT>(leftBottom - Y + 1, 7);
+
+    // check console size; fall back to text if not enough space
+    CONSOLE_SCREEN_BUFFER_INFO cs; GetConsoleScreenBufferInfo(hout, &cs);
+    SHORT winW = cs.srWindow.Right - cs.srWindow.Left + 1;
+    SHORT winH = cs.srWindow.Bottom - cs.srWindow.Top + 1;
+    SHORT reqW = infoX + infoW + 2;
+    SHORT reqH = max<SHORT>(infoY + infoH + 2, leftBottom + 2);
+    if (winW < reqW || winH < reqH) {
+        return fallbackPick(title, options, oldMode, hin);
+    }
+
+    // draw now that we know space is sufficient
+    drawFrame(hout, X, Y, frameW, title);
+    for (size_t i = 0; i < rects.size(); ++i) {
+        drawButton(hout, rects[i], options[i], false);
+    }
     drawInfoBox(hout, infoX, infoY, infoW, infoH, "INFO");
     if (!options.empty()) {
         string tip = (!infos.empty() && (int)infos.size() > 0) ? infos[0] : "Left-click de chon nua.";
