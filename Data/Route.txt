@@ -28,4 +28,3 @@ R027,Da Nang - Phan Thiet,Da Nang,Phan Thiet,790,990
 R028,Da Nang - Soc Trang,Da Nang,Soc Trang,1100,1320
 R029,Da Nang - Bac Giang,Da Nang,Bac Giang,780,960
 R030,Da Nang - Hai Duong,Da Nang,Hai Duong,760,940
-R031,Da Nang - Hoi An,Da Nang,Hoi An,30,45

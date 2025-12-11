@@ -1,4 +1,3 @@
-// File: Function/ConsoleMenu.cpp
 #include "../Class/ConsoleMenu.h"
 #include <iostream>
 #include <vector>
@@ -116,10 +115,8 @@ int ConsoleMenu::pick(const std::string& title,
     mode &= ~(ENABLE_QUICK_EDIT_MODE | ENABLE_INSERT_MODE);
     SetConsoleMode(hin, mode);
 
-    // xoá sự kiện cũ để tránh auto-pick
     FlushConsoleInputBuffer(hin);
 
-    // chiều rộng khung
     size_t maxLabel = title.size();
     for (auto& s : options) maxLabel = max(maxLabel, s.size());
     SHORT frameW = (SHORT)max<int>((int)maxLabel + 8, 38);
@@ -175,10 +172,10 @@ int ConsoleMenu::pick(const std::string& title,
                 if (idx != hover) {
                     if (hover >= 0) drawButton(hout, rects[hover], options[hover], false);
                     if (idx   >= 0) drawButton(hout, rects[idx],  options[idx],  true);
-                    // cập nhật info
+                    // update info
                     string tip = (idx >=0 && idx < (int)infos.size() && !infos[idx].empty())
                                  ? infos[idx]
-                                 : "Left-click de chon.";
+                                 : "Left-click to select.";
                     renderInfoText(hout, infoX, infoY, infoW, infoH, tip);
                     hover = idx;
                 }
