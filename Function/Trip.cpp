@@ -52,9 +52,9 @@ Trip Trip::fromCSV(const string& line) {
 
     return Trip(
         p[0], // tripId
-        p[3], // routeId
-        p[1], // busId
-        p[2], // driverId
+        p[1], // routeId
+        p[2], // busId
+        p[3], // driverId
         p[4], // depart
         p[5]  // arrival
     );

@@ -1,0 +1,84 @@
+# Qt build files
+build/
+release/
+debug/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.exe
+*.dll
+*.dylib
+
+# Qt MOC and RCC generated files
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Qt Creator user files
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+
+# Qt Creator IDE
+.qmake.stash
+.qmake.cache
+.qmakecache
+
+# Miscellaneous Qt files
+*_qml_plugin_import.cpp
+Makefile
+Makefile.Debug
+Makefile.Release
+
+# IDE and editor files
+.vscode/
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python and other build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+*.backup
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# CMake (if used)
+CMakeFiles/
+cmake_install.cmake
+CMakeCache.txt
+
+# Keep important files
+!Data/
+!Class/
+!Function/
+!UI/
+!icons/
+!*.cpp
+!*.h
+!*.pro
+!*.ui
+!*.qrc
+!*.ps1
+!README.md
+!.gitignore

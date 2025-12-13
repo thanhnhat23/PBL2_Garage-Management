@@ -23,4 +23,11 @@ class Brand: public Ultil<Brand> {
         // Getter
         string getId() const { return brandId; }
         string getName() const { return nameBrand; }
+        string getHotline() const { return hotline; }
+        double getRating() const { return rating; }
+        
+        // Setter
+        void setName(const string& name) { nameBrand = name; }
+        void setHotline(const string& phone) { hotline = phone; }
+        void setRating(double rate) { rating = rate; }
 };

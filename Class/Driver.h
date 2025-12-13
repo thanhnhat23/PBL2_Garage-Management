@@ -26,4 +26,10 @@ class Driver: public Ultil<Driver> {
         string getName() const { return nameDriver; }
         int getExp() const { return experienceYears; }
         string getPhone() const { return phoneDriver; }
+        
+        // Setters
+        void setName(const string& name) { nameDriver = name; }
+        void setBus(const string& bus) { busId = bus; }
+        void setPhone(const string& phone) { phoneDriver = phone; }
+        void setExp(int exp) { experienceYears = exp; }
 };

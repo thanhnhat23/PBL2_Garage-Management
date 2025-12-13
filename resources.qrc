@@ -1,0 +1,20 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file>icons/logo.png</file>
+    <file>icons/ticket-add.svg</file>
+    <file>icons/ticket-cancel.svg</file>
+    <file>icons/ticket.svg</file>
+    <file>icons/refresh.svg</file>
+    <file>icons/logout.svg</file>
+    <file>icons/seat-map.svg</file>
+    <file>icons/add.svg</file>
+    <file>icons/delete.svg</file>
+    <file>icons/brand.svg</file>
+    <file>icons/route.svg</file>
+    <file>icons/bus.svg</file>
+    <file>icons/driver.svg</file>
+    <file>icons/trip.svg</file>
+    <file>icons/stats.svg</file>
+    <file>icons/calendar.svg</file>
+  </qresource>
+</RCC>
