@@ -24,6 +24,10 @@ UserWindow::UserWindow(QWidget *parent)
     loadData();
     populateTrips();
     populateMyTickets();
+    
+    refreshTimer = new QTimer(this);
+    connect(refreshTimer, &QTimer::timeout, this, &UserWindow::refreshData);
+    refreshTimer->start(5000); // Refresh every 5 seconds
 }
 
 UserWindow::~UserWindow() {
@@ -281,11 +285,12 @@ void UserWindow::setupTabs() {
     tLayout->addWidget(calendar);
     tripTable = new QTableWidget(tripsTab);
     tripTable->setStyleSheet(StyleHelper::getTableStyle());
-    tripTable->setColumnCount(3);
-    tripTable->setHorizontalHeaderLabels({"ID","Tuyến","Xe"});
+    tripTable->setColumnCount(5);
+    tripTable->setHorizontalHeaderLabels({"ID","Tuyến","Xe","Giờ đi","Giờ đến"});
     tripTable->horizontalHeader()->setStretchLastSection(true);
     tripTable->verticalHeader()->setVisible(false);
     tripTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+        tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
     tLayout->addWidget(tripTable);
     QPushButton *btnBook = new QPushButton("Đặt vé", tripsTab);
     btnBook->setIcon(renderSvgIcon(":/icons/icons/ticket-add.svg", QSize(16,16), "#22c55e"));
@@ -316,6 +321,7 @@ void UserWindow::setupTabs() {
     myTicketsTable->horizontalHeader()->setStretchLastSection(true);
     myTicketsTable->verticalHeader()->setVisible(false);
     myTicketsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+        myTicketsTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
     mLayout->addWidget(myTicketsTable);
     QPushButton *btnCancel = new QPushButton("Hủy vé", myTab);
     btnCancel->setIcon(renderSvgIcon(":/icons/icons/ticket-cancel.svg", QSize(16,16), "#ef4444"));
@@ -354,6 +360,8 @@ void UserWindow::populateTrips() {
         tripTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(rt.getName())));
         auto bs = busMap[tr.getBusId()];
         tripTable->setItem(row,2,new QTableWidgetItem(QString::fromStdString(bs.getName())));
+        tripTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tr.getDepart())));
+        tripTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tr.getArrival())));
     }
 }
 
@@ -435,9 +443,14 @@ void UserWindow::onBookTicketClicked() {
     QGridLayout *grid = new QGridLayout(seatGrid);
     grid->setSpacing(6);
     QButtonGroup *seatGroup = new QButtonGroup(&dlg);
-    seatGroup->setExclusive(true);
+    seatGroup->setExclusive(false); // Allow multiple selection
     int cols = 4;
-    int selectedSeat = 0;
+    std::set<int> selectedSeats;
+    
+    // Price preview label
+    QLabel *pricePreview = new QLabel(QString("Tổng tiền: 0 VND"), &dlg);
+    pricePreview->setStyleSheet("font-size: 16px; font-weight: bold; color: #22c55e; padding: 10px;");
+    pricePreview->setAlignment(Qt::AlignCenter);
     
     for (int i=1;i<=capacity;i++){
         QPushButton *btn = new QPushButton(QString::number(i), seatGrid);
@@ -450,27 +463,35 @@ void UserWindow::onBookTicketClicked() {
         } else {
             btn->setStyleSheet("QPushButton { background: #1f2937; color: #e5e7eb; border: 1px solid #334155; border-radius: 6px; } QPushButton:checked { background: #2563eb; color: #f8fafc; font-weight: 700; }");
             seatGroup->addButton(btn, i);
+            // Update price preview when seat is selected/deselected
+            QObject::connect(btn, &QPushButton::toggled, [&, i, pricePreview, tripPrice](bool checked) {
+                if (checked) {
+                    selectedSeats.insert(i);
+                } else {
+                    selectedSeats.erase(i);
+                }
+                unsigned long totalPrice = selectedSeats.size() * tripPrice;
+                pricePreview->setText(QString("Tổng tiền: %1 VND").arg(totalPrice));
+            });
         }
         int r = (i-1)/cols, c = (i-1)%cols; grid->addWidget(btn, r, c);
     }
     layout->addWidget(seatGrid);
+    layout->addWidget(pricePreview);
     
     QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     layout->addWidget(buttons);
     QObject::connect(buttons, &QDialogButtonBox::accepted, [&](){ 
-        selectedSeat = seatGroup->checkedId();
-        std::cout << "DEBUG: Seat selected = " << selectedSeat << std::endl;
         dlg.accept();
     });
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     
     if (dlg.exec() != QDialog::Accepted) return;
     
-    int seatNo = selectedSeat;
     QString phone = phoneEdit->text().trimmed();
     QString pay = payment->currentText();
     
-    if (seatNo<=0){ QMessageBox::warning(this,"Đặt vé","Chọn một ghế"); return; }
+    if (selectedSeats.empty()){ QMessageBox::warning(this,"Đặt vé","Chọn ít nhất một ghế"); return; }
     if (phone.isEmpty()){ QMessageBox::warning(this,"Đặt vé","Nhập số điện thoại"); return; }
     
     // Determine file based on trip ID: T005 -> TK005.txt
@@ -496,17 +517,14 @@ void UserWindow::onBookTicketClicked() {
         }
     }
 
-    // Create new ticket ID: if TK012 is max, next is TK013
-    std::string newId = "TK" + std::string(3 - std::to_string(maxTkNum + 1).length(), '0') + std::to_string(maxTkNum + 1);
     std::string phoneStr = phone.toStdString();
     std::string payStr = pay.toStdString();
     std::string bookedAtStr = (dateStr + " 00:00").toStdString();
-    Ticket tk(newId, tripId.toStdString(), busId, seatNo, userName, phoneStr, tripPrice, bookedAtStr, payStr);
     
     try {
-        std::cout << "DEBUG: Saving ticket to file: " << fileId << std::endl;
+        std::cout << "DEBUG: Saving tickets to file: " << fileId << std::endl;
 
-        // Append safely to trip file: ensure newline before appending
+        // Append all selected seats as separate tickets
         std::string path = std::string("Data/Ticket/") + fileId + ".txt";
         {
             std::fstream out(path, std::ios::in | std::ios::out | std::ios::app);
@@ -522,29 +540,34 @@ void UserWindow::onBookTicketClicked() {
                 char last; out.get(last);
                 if (last != '\n') out << '\n';
             }
-            out << tk.toCSV() << "\n";
+            
+            // Create and save tickets for each selected seat
+            for (int seatNo : selectedSeats) {
+                maxTkNum++;
+                std::string newId = "TK" + std::string(3 - std::to_string(maxTkNum).length(), '0') + std::to_string(maxTkNum);
+                Ticket tk(newId, tripId.toStdString(), busId, seatNo, userName, phoneStr, tripPrice, bookedAtStr, payStr);
+                out << tk.toCSV() << "\n";
+                
+                // Add to memory
+                tickets.push_back(tk);
+                
+                // Add row to table
+                int row = myTicketsTable->rowCount();
+                myTicketsTable->insertRow(row);
+                myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
+                myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+                myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
+                myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
+                myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
+                myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+                myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
+            }
             out.close();
         }
-        std::cout << "DEBUG: File written successfully" << std::endl;
+        std::cout << "DEBUG: All tickets saved successfully" << std::endl;
         
-        std::cout << "DEBUG: Adding ticket to memory" << std::endl;
-        tickets.push_back(tk);
-        std::cout << "DEBUG: Total tickets now: " << tickets.size() << std::endl;
-        
-        // Directly add row to table instead of calling populateMyTickets()
-        std::cout << "DEBUG: Adding row to table directly" << std::endl;
-        int row = myTicketsTable->rowCount();
-        myTicketsTable->insertRow(row);
-        myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-        myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
-        myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
-        myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
-        myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-        myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
-        myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
-        std::cout << "DEBUG: Row added successfully" << std::endl;
-        
-        QMessageBox::information(this, "Đặt vé", "Đặt vé thành công");
+        unsigned long totalPrice = selectedSeats.size() * tripPrice;
+        QMessageBox::information(this, "Đặt vé", QString("Đặt %1 vé thành công! Tổng: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
     } catch (const std::exception &e) {
         std::cout << "DEBUG: Exception: " << e.what() << std::endl;
         QMessageBox::critical(this, "Lỗi", QString("Lỗi khi lưu vé: %1").arg(e.what()));
@@ -637,4 +660,17 @@ void UserWindow::onCancelMyTicketClicked() {
 
 void UserWindow::onLogoutClicked() {
     emit logout();
+}
+
+void UserWindow::refreshData() {
+    // Reload data from files
+    loadData();
+    // Update tables
+    populateTrips();
+    populateMyTickets();
+}
+
+void UserWindow::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    refreshData(); // Force reload when the window becomes visible
 }

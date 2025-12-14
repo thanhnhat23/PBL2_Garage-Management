@@ -1,8 +1,8 @@
-R001,Da Nang - Hue,Da Nang,Hue,100,150
+R001,Da Nang - Hue,Da Nang,Hue,40,70
 R002,Da Nang - Quang Nam,Da Nang,Quang Nam,70,100
 R003,Da Nang - Quang Ngai,Da Nang,Quang Ngai,130,180
 R004,Da Nang - Ha Noi,Da Nang,Ha Noi,770,960
-R005,Da Nang - Sai Gon,Da Nang,Sai Gon,960,1200
+R005,Da Nang - Ho Chi Minh,Da Nang,Ho Chi Minh,560,670 
 R006,Da Nang - Nha Trang,Da Nang,Nha Trang,530,720
 R007,Da Nang - Da Lat,Da Nang,Da Lat,630,840
 R008,Da Nang - Quy Nhon,Da Nang,Quy Nhon,320,420

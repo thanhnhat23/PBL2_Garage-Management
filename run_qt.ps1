@@ -1,7 +1,3 @@
-# Run Qt Application
-# This script ensures the app runs from the project root directory
-# so it can find the Data/ folder
-
 Write-Host "Running Qt Application..." -ForegroundColor Cyan
 
 $exePath = "build\release\GarageManagement.exe"
