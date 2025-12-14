@@ -7,6 +7,8 @@
 #include <QTabWidget>
 #include <QCalendarWidget>
 #include <QTableWidget>
+#include <QTimer>
+#include <QShowEvent>
 #include "../Class/User.h"
 #include "StyleHelper.h"
 #include "../Class/Route.h"
@@ -22,6 +24,8 @@ public:
     explicit UserWindow(QWidget *parent = nullptr);
     ~UserWindow();
     void setUser(User user);
+protected:
+    void showEvent(QShowEvent *event) override; // Refresh when window is shown
     
     static QIcon renderSvgIcon(const QString& resourcePath, const QSize& size = QSize(24, 24), const QString& colorHex = "#cbd5e1");
 
@@ -33,6 +37,7 @@ private slots:
     void onViewSeatMapClicked();
     void onCancelMyTicketClicked();
     void onLogoutClicked();
+    void refreshData();
 
 private:
     User currentUser;
@@ -42,6 +47,7 @@ private:
     QTableWidget *myTicketsTable;
     QString ticketSearch;
     QPushButton *activeButton = nullptr;
+    QTimer *refreshTimer;
 
     // Data
     std::vector<Route> routes;

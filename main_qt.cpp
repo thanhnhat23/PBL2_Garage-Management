@@ -1,6 +1,6 @@
 #include <QApplication>
 #include <QDebug>
-#include "UI/MainWindow.h"
+#include "UI/windows/MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
     }
     
     // Set application info
-    app.setApplicationName("Garage Management System");
+    app.setApplicationName("Garage Management");
     app.setApplicationVersion("1.0");
     app.setOrganizationName("PBL2");
     

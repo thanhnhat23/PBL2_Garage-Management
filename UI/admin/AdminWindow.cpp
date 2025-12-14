@@ -1184,7 +1184,9 @@ void AdminWindow::populateBrandsTable() {
             rating.toLower().contains(term);
         if (!matches) continue;
 
-        table->setItem(row, 0, new QTableWidgetItem(id));
+        auto idItem = new QTableWidgetItem(id);
+        idItem->setData(Qt::UserRole, id); // Store actual ID
+        table->setItem(row, 0, idItem);
         table->setItem(row, 1, new QTableWidgetItem(name));
         table->setItem(row, 2, new QTableWidgetItem(hotline));
         table->setItem(row, 3, new QTableWidgetItem(rating));
@@ -1217,7 +1219,9 @@ void AdminWindow::populateRoutesTable() {
             duration.toLower().contains(term);
         if (!matches) continue;
 
-        table->setItem(row, 0, new QTableWidgetItem(id));
+        auto idItem = new QTableWidgetItem(id);
+        idItem->setData(Qt::UserRole, id);
+        table->setItem(row, 0, idItem);
         table->setItem(row, 1, new QTableWidgetItem(name));
         table->setItem(row, 2, new QTableWidgetItem(start));
         table->setItem(row, 3, new QTableWidgetItem(end));
@@ -1258,7 +1262,9 @@ void AdminWindow::populateBusesTable() {
             capacity.toLower().contains(term);
         if (!matches) continue;
 
-        table->setItem(row, 0, new QTableWidgetItem(id));
+        auto idItem = new QTableWidgetItem(id);
+        idItem->setData(Qt::UserRole, id);
+        table->setItem(row, 0, idItem);
         table->setItem(row, 1, new QTableWidgetItem(name));
         table->setItem(row, 2, new QTableWidgetItem(brandName));
         table->setItem(row, 3, new QTableWidgetItem(type));
@@ -1299,7 +1305,9 @@ void AdminWindow::populateDriversTable() {
             exp.toLower().contains(term);
         if (!matches) continue;
 
-        table->setItem(row, 0, new QTableWidgetItem(id));
+        auto idItem = new QTableWidgetItem(id);
+        idItem->setData(Qt::UserRole, id);
+        table->setItem(row, 0, idItem);
         table->setItem(row, 1, new QTableWidgetItem(name));
         table->setItem(row, 2, new QTableWidgetItem(busDisplay));
         table->setItem(row, 3, new QTableWidgetItem(phone));
@@ -1397,7 +1405,9 @@ void AdminWindow::populateTripsTable() {
             arrival.toLower().contains(term);
         if (!matches) continue;
 
-        table->setItem(row, 0, new QTableWidgetItem(id));
+        auto idItem = new QTableWidgetItem(id);
+        idItem->setData(Qt::UserRole, id);
+        table->setItem(row, 0, idItem);
         table->setItem(row, 1, new QTableWidgetItem(routeName));
         table->setItem(row, 2, new QTableWidgetItem(busName));
         table->setItem(row, 3, new QTableWidgetItem(driverName));
@@ -1826,9 +1836,13 @@ void AdminWindow::onEditRouteClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)routes.size()) return;
+    QString routeId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    Route selected = routes[row];
+    auto it = std::find_if(routes.begin(), routes.end(),
+        [&](const Route& r){ return r.getId() == routeId.toStdString(); });
+    if (it == routes.end()) return;
+    
+    Route selected = *it;
     RouteDialog dlg(this, &selected);
     if (dlg.exec() == QDialog::Accepted) {
         Route updated = dlg.getRoute();
@@ -1841,7 +1855,7 @@ void AdminWindow::onEditRouteClicked() {
                 end = updated.getName().substr(pos + 3);
             }
         }
-        routes[row] = Route(selected.getId(), updated.getName(), start, end, updated.getDistance(), updated.getDuration());
+        *it = Route(selected.getId(), updated.getName(), start, end, updated.getDistance(), updated.getDuration());
         Ultil<Route>::saveToFile("Data/Route.txt", routes);
         populateRoutesTable();
     }
@@ -1853,11 +1867,12 @@ void AdminWindow::onDeleteRouteClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)routes.size()) return;
+    QString routeId = table->item(row, 0)->data(Qt::UserRole).toString();
     
     auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected route?");
     if (reply == QMessageBox::Yes) {
-        routes.erase(routes.begin() + row);
+        routes.erase(std::remove_if(routes.begin(), routes.end(),
+            [&](const Route& r){ return r.getId() == routeId.toStdString(); }), routes.end());
         Ultil<Route>::saveToFile("Data/Route.txt", routes);
         populateRoutesTable();
     }
@@ -1911,13 +1926,17 @@ void AdminWindow::onEditBusClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)buses.size()) return;
+    QString busId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    Bus selected = buses[row];
+    auto it = std::find_if(buses.begin(), buses.end(),
+        [&](const Bus& b){ return b.getId() == busId.toStdString(); });
+    if (it == buses.end()) return;
+    
+    Bus selected = *it;
     BusDialog dlg(this, brands, &selected);
     if (dlg.exec() == QDialog::Accepted) {
         Bus updated = dlg.getBus();
-        buses[row] = Bus(selected.getId(), updated.getBrandId(), updated.getName(), updated.getType(), updated.getCapacity());
+        *it = Bus(selected.getId(), updated.getBrandId(), updated.getName(), updated.getType(), updated.getCapacity());
         Ultil<Bus>::saveToFile("Data/Bus.txt", buses);
         populateBusesTable();
     }
@@ -1929,14 +1948,15 @@ void AdminWindow::onDeleteBusClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)buses.size()) return;
+    QString busId = table->item(row, 0)->data(Qt::UserRole).toString();
     
     auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected bus? This will remove drivers and seats.");
     if (reply == QMessageBox::Yes) {
-        std::string targetId = buses[row].getId();
+        std::string targetId = busId.toStdString();
         
         // Remove Bus
-        buses.erase(buses.begin() + row);
+        buses.erase(std::remove_if(buses.begin(), buses.end(),
+            [&](const Bus& b){ return b.getId() == targetId; }), buses.end());
         Ultil<Bus>::saveToFile("Data/Bus.txt", buses);
         
         // Remove Drivers for this bus
@@ -1977,13 +1997,17 @@ void AdminWindow::onEditTripClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)trips.size()) return;
+    QString tripId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    Trip selected = trips[row];
+    auto it = std::find_if(trips.begin(), trips.end(),
+        [&](const Trip& t){ return t.getId() == tripId.toStdString(); });
+    if (it == trips.end()) return;
+    
+    Trip selected = *it;
     TripDialog dlg(this, routes, buses, drivers, trips, &selected);
     if (dlg.exec() == QDialog::Accepted) {
         Trip updated = dlg.getTrip();
-        trips[row] = Trip(selected.getId(), updated.getRouteId(), updated.getBusId(), updated.getDriverId(), updated.getDepart(), updated.getArrival());
+        *it = Trip(selected.getId(), updated.getRouteId(), updated.getBusId(), updated.getDriverId(), updated.getDepart(), updated.getArrival());
         Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
         populateTripsTable();
     }
@@ -1995,11 +2019,12 @@ void AdminWindow::onDeleteTripClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)trips.size()) return;
+    QString tripId = table->item(row, 0)->data(Qt::UserRole).toString();
     
     auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected trip?");
     if (reply == QMessageBox::Yes) {
-        trips.erase(trips.begin() + row);
+        trips.erase(std::remove_if(trips.begin(), trips.end(),
+            [&](const Trip& t){ return t.getId() == tripId.toStdString(); }), trips.end());
         Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
         populateTripsTable();
     }
@@ -2040,9 +2065,14 @@ void AdminWindow::onEditBrandClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)brands.size()) return;
+    QString brandId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    Brand& b = brands[row];
+    // Find brand by ID
+    auto it = std::find_if(brands.begin(), brands.end(), 
+        [&](const Brand& b){ return b.getId() == brandId.toStdString(); });
+    if (it == brands.end()) return;
+    
+    Brand& b = *it;
     bool ok;
     QString name = QInputDialog::getText(this, "Sửa hãng", "Tên hãng:", QLineEdit::Normal, QString::fromStdString(b.getName()), &ok);
     if (ok && !name.isEmpty()) b.setName(name.toStdString());
@@ -2063,11 +2093,12 @@ void AdminWindow::onDeleteBrandClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)brands.size()) return;
+    QString brandId = table->item(row, 0)->data(Qt::UserRole).toString();
     
     auto reply = QMessageBox::question(this, "Xác nhận", "Xóa hãng này?");
     if (reply == QMessageBox::Yes) {
-        brands.erase(brands.begin() + row);
+        brands.erase(std::remove_if(brands.begin(), brands.end(),
+            [&](const Brand& b){ return b.getId() == brandId.toStdString(); }), brands.end());
         Ultil<Brand>::saveToFile("Data/Brand.txt", brands);
         populateBrandsTable();
     }
@@ -2114,9 +2145,13 @@ void AdminWindow::onEditDriverClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)drivers.size()) return;
+    QString driverId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    Driver& d = drivers[row];
+    auto it = std::find_if(drivers.begin(), drivers.end(),
+        [&](const Driver& d){ return d.getId() == driverId.toStdString(); });
+    if (it == drivers.end()) return;
+    
+    Driver& d = *it;
     bool ok;
     QString name = QInputDialog::getText(this, "Sửa tài xế", "Tên:", QLineEdit::Normal, QString::fromStdString(d.getName()), &ok);
     if (ok && !name.isEmpty()) d.setName(name.toStdString());
@@ -2137,11 +2172,12 @@ void AdminWindow::onDeleteDriverClicked() {
     auto items = table->selectedItems();
     if (items.empty()) return;
     int row = table->row(items.first());
-    if (row < 0 || row >= (int)drivers.size()) return;
+    QString driverId = table->item(row, 0)->data(Qt::UserRole).toString();
     
     auto reply = QMessageBox::question(this, "Xác nhận", "Xóa tài xế này?");
     if (reply == QMessageBox::Yes) {
-        drivers.erase(drivers.begin() + row);
+        drivers.erase(std::remove_if(drivers.begin(), drivers.end(),
+            [&](const Driver& d){ return d.getId() == driverId.toStdString(); }), drivers.end());
         Ultil<Driver>::saveToFile("Data/Driver.txt", drivers);
         populateDriversTable();
     }
