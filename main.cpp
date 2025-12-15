@@ -97,7 +97,8 @@ static void createAccount(vector<User>& users) {
     ui::DrawPanel("CREATE ACCOUNT");
     flushConsoleEvents();
 
-    string uname, pwd, confirm;
+    string uname, pwd, confirm, phone;
+
     while (true) {
         cout << "Username (>= 3 ky tu, khong dau): ";
         getline(cin, uname);
@@ -105,6 +106,7 @@ static void createAccount(vector<User>& users) {
         if (usernameExists(users, uname)) { cout << "Username da ton tai. Thu ten khac.\n"; continue; }
         break;
     }
+    
     cout << "Password (>= 4 ky tu): "; getline(cin, pwd);
     cout << "Confirm  : "; getline(cin, confirm);
     if (pwd.size() < 4 || pwd != confirm) {
@@ -112,8 +114,15 @@ static void createAccount(vector<User>& users) {
         system("pause"); return;
     }
 
+    cout << "Phone Number: "; getline(cin, phone);
+    if (phone.empty()) {
+        cout << "SĐT khong duoc de trong.\n";
+        system("pause"); return;
+    }
+
     string uid = nextUserId(users);
-    users.push_back(User(uid, uname, pwd, Role::USER));
+    
+    users.push_back(User(uid, uname, pwd, Role::USER, phone)); 
 
     ofstream fout("Data/User.txt");
     for (auto &u : users) fout << u.toCSV() << "\n";
@@ -122,6 +131,7 @@ static void createAccount(vector<User>& users) {
     cout << "\nTao tai khoan thanh cong!\n"
          << "  ID: " << uid << "\n"
          << "  Username: " << uname << "\n"
+         << "  Phone: " << phone << "\n"
          << "  Role: USER\n\n";
     system("pause");
 }
@@ -373,12 +383,16 @@ static void menuBrand(vector<Brand>& brands) {
             if (brands.empty()) {
                 cout << "No brands available.\n";
             } else {
-                cout << left << setw(10) << "ID" << setw(25) << "Name" << setw(20) << "Country" << "\n";
-                cout << string(55, '-') << "\n";
+                cout << left << setw(10) << "ID" 
+                     << setw(25) << "Name" 
+                     << setw(15) << "Hotline" 
+                     << setw(10) << "Rating" << "\n";
+                cout << string(60, '-') << "\n";
                 for (const auto& b : brands) {
                     cout << left << setw(10) << b.getId() 
                          << setw(25) << b.getName() 
-                         << setw(20) << b.getCountry() << "\n";
+                         << setw(15) << b.getHotline() 
+                         << setw(10) << fixed << setprecision(1) << b.getRating() << "\n";
                 }
             }
             cout << "\n"; system("pause");
@@ -386,26 +400,27 @@ static void menuBrand(vector<Brand>& brands) {
         else if (sel == 1) { // Add
             ui::DrawPanel("ADD NEW BRAND");
             flushConsoleEvents();
-            string name, country;
+            string name, phone, rateStr;
+            float rate = 0.0;
+
             cout << "Brand Name: "; getline(cin, name);
             if (name.empty()) continue;
-            cout << "Country: "; getline(cin, country);
-            if (country.empty()) continue;
+            
+            cout << "Hotline: "; getline(cin, phone);
+            
+            cout << "Rating (0-5): "; getline(cin, rateStr);
+            try { rate = stof(rateStr); } catch(...) { rate = 0.0; }
 
             string lastId = brands.empty() ? "BR000" : brands.back().getId();
             int next = 0; 
             try { next = stoi(lastId.substr(2)) + 1; } catch(...) {}
             stringstream ss; ss << "BR" << setw(3) << setfill('0') << next;
 
-            Brand b(ss.str(), name, country);
+            Brand b(ss.str(), name, phone, rate);
             brands.push_back(b);
             Ultil<Brand>::saveToFile("Data/Brand.txt", brands);
+            
             cout << "\nAdded brand " << b.getId() << " successfully.\n";
-            cout << left << setw(10) << "ID" << setw(25) << "Name" << setw(20) << "Country" << "\n";
-            cout << string(55, '-') << "\n";
-            cout << left << setw(10) << b.getId() 
-                 << setw(25) << b.getName() 
-                 << setw(20) << b.getCountry() << "\n";
             cout << "\n"; system("pause");
         }
         else if (sel == 2) { // Update
@@ -418,17 +433,22 @@ static void menuBrand(vector<Brand>& brands) {
 
             auto& b = brands[idx];
             cout << "\nEditing: " << b.getName() << "\n";
-            string name, country;
+            
+            string name, phone, rateStr;
+            
             cout << "New Name [" << b.getName() << "]: "; getline(cin, name);
             if (!name.empty()) b.setName(name);
-            cout << "New Country [" << b.getCountry() << "]: "; getline(cin, country);
-            if (!country.empty()) b.setCountry(country);
+            
+            cout << "New Hotline [" << b.getHotline() << "]: "; getline(cin, phone);
+            if (!phone.empty()) b.setHotline(phone);
+
+            cout << "New Rating [" << b.getRating() << "]: "; getline(cin, rateStr);
+            if (!rateStr.empty()) {
+                try { float r = stof(rateStr); b.setRating(r); } catch(...) {}
+            }
 
             Ultil<Brand>::saveToFile("Data/Brand.txt", brands);
             cout << "\nUpdated successfully.\n";
-            cout << left << setw(10) << b.getId() 
-                 << setw(25) << b.getName() 
-                 << setw(20) << b.getCountry() << "\n";
             cout << "\n"; system("pause");
         }
         else if (sel == 3) { // Delete

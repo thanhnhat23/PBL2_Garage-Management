@@ -4,7 +4,7 @@
 Write-Host "Building Qt Project..." -ForegroundColor Green
 
 $qtPaths = @(
-    "D:\Install\QT\6.10.1\mingw_64\bin",
+    "D:\QT\6.10.1\mingw_64\bin",
     "C:\Qt\6.10.1\mingw_64\bin"
 )
 

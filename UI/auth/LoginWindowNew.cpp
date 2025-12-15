@@ -168,15 +168,10 @@ void LoginWindowNew::onLoginClicked() {
 }
 
 void LoginWindowNew::onCreateAccountClicked() {
-    // Dialog to create new account
     bool ok;
     QString username = QInputDialog::getText(this, "Create Account", "Username:", QLineEdit::Normal, "", &ok);
+    if (!ok || username.isEmpty()) return;
 
-    if (!ok || username.isEmpty()) {
-        return;
-    }
-
-    // Check if username already exists
     for (const auto& user : users) {
         if (user.getUsername() == username.toStdString()) {
             QMessageBox::warning(this, "Error", "Username already exists!");
@@ -185,24 +180,25 @@ void LoginWindowNew::onCreateAccountClicked() {
     }
 
     QString password = QInputDialog::getText(this, "Create Account", "Password:", QLineEdit::Password, "", &ok);
+    if (!ok || password.isEmpty()) return;
 
-    if (!ok || password.isEmpty()) {
+    QString phone = QInputDialog::getText(this, "Create Account", "Phone Number:", QLineEdit::Normal, "", &ok);
+    if (!ok || phone.isEmpty()) {
+        QMessageBox::warning(this, "Error", "Phone number is required!");
         return;
     }
-
-    // Generate ID with proper format (U001, U002, U003, etc.)
+    // Generate ID
     int nextId = users.size() + 1;
-    QString userId = QString("U%1").arg(nextId, 3, 10, QChar('0'));  // Format as U001, U002, etc.
+    QString userId = QString("U%1").arg(nextId, 3, 10, QChar('0'));
 
-    // Create new user with USER role
     User newUser(userId.toStdString(),
                  username.toStdString(),
                  password.toStdString(),
-                 Role::USER);
+                 Role::USER,
+                 phone.toStdString());
 
     users.push_back(newUser);
     saveUsers();
-
     QMessageBox::information(this, "Success", "Account created successfully! Please login.");
     clearForm();
 }

@@ -366,24 +366,20 @@ void UserWindow::populateTrips() {
 }
 
 void UserWindow::populateMyTickets() {
-    std::cout << "DEBUG: populateMyTickets() called" << std::endl;
     myTicketsTable->setRowCount(0);
-    std::cout << "DEBUG: Row count cleared" << std::endl;
     
-    // Filter tickets by current user (name or phone match)
     std::string userName = currentUser.getUsername();
-    std::cout << "DEBUG: Current user name: " << userName << std::endl;
-    if (userName.empty()) {
-        std::cout << "DEBUG: User name is empty, returning" << std::endl;
-        return; // User not logged in
-    }
+    std::string userPhone = currentUser.getPhoneNumber();
     
-    std::cout << "DEBUG: Total tickets to process: " << tickets.size() << std::endl;
+    if (userName.empty()) return;
+    
     for (size_t idx = 0; idx < tickets.size(); idx++){ 
         const auto &tk = tickets[idx];
-        std::cout << "DEBUG: Checking ticket " << idx << ": " << tk.getId() << " passenger: " << tk.getPassengerName() << std::endl;
-        if (tk.getPassengerName()==userName){
-            std::cout << "DEBUG: Ticket matches current user, adding to table" << std::endl;
+        
+        bool matchName = (tk.getPassengerName() == userName);
+        bool matchPhone = (!userPhone.empty() && tk.getPhoneNumber() == userPhone);
+
+        if (matchName || matchPhone) {
             int row = myTicketsTable->rowCount(); 
             myTicketsTable->insertRow(row);
             myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
@@ -393,15 +389,15 @@ void UserWindow::populateMyTickets() {
             myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
             myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
             myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
-            std::cout << "DEBUG: Row " << row << " added successfully" << std::endl;
         }
     }
-    std::cout << "DEBUG: populateMyTickets() finished" << std::endl;
 }
 
 void UserWindow::onBookTicketClicked() {
     // Validate current user
     std::string userName = currentUser.getUsername();
+    std::string userPhone = currentUser.getPhoneNumber(); 
+
     if (userName.empty()) { QMessageBox::warning(this, "Đặt vé", "Lỗi: Người dùng chưa đăng nhập"); return; }
     
     // Use selected trip
@@ -423,15 +419,21 @@ void UserWindow::onBookTicketClicked() {
     
     // Create dialog with all inputs
     QDialog dlg(this);
-    dlg.setWindowTitle("Đặt vé");
+    dlg.setWindowTitle("Đặt vé chuyến " + tripId);
     QVBoxLayout *layout = new QVBoxLayout(&dlg);
     
-    QLabel *lblDate = new QLabel(QString("Ngày: %1").arg(dateStr), &dlg);
-    layout->addWidget(lblDate);
+    layout->addWidget(new QLabel(QString("Ngày khởi hành: %1").arg(dateStr), &dlg));
     
+    QLineEdit *nameEdit = new QLineEdit(&dlg);
+    nameEdit->setPlaceholderText("Nhập họ và tên hành khách");
+    nameEdit->setStyleSheet(StyleHelper::getInputStyle());
+    layout->addWidget(nameEdit);
+
     QLineEdit *phoneEdit = new QLineEdit(&dlg);
-    phoneEdit->setPlaceholderText("Số điện thoại");
+    phoneEdit->setPlaceholderText("Nhập số điện thoại");
     phoneEdit->setStyleSheet(StyleHelper::getInputStyle());
+    phoneEdit->setText(QString::fromStdString(userPhone)); 
+    //if (!userPhone.empty()) phoneEdit->setReadOnly(true); (Khong cho phép sửa SĐT)
     layout->addWidget(phoneEdit);
     
     QComboBox *payment = new QComboBox(&dlg);
@@ -443,11 +445,11 @@ void UserWindow::onBookTicketClicked() {
     QGridLayout *grid = new QGridLayout(seatGrid);
     grid->setSpacing(6);
     QButtonGroup *seatGroup = new QButtonGroup(&dlg);
-    seatGroup->setExclusive(false); // Allow multiple selection
+    seatGroup->setExclusive(false); 
     int cols = 4;
     std::set<int> selectedSeats;
     
-    // Price preview label
+        // Price preview label
     QLabel *pricePreview = new QLabel(QString("Tổng tiền: 0 VND"), &dlg);
     pricePreview->setStyleSheet("font-size: 16px; font-weight: bold; color: #22c55e; padding: 10px;");
     pricePreview->setAlignment(Qt::AlignCenter);
@@ -465,11 +467,7 @@ void UserWindow::onBookTicketClicked() {
             seatGroup->addButton(btn, i);
             // Update price preview when seat is selected/deselected
             QObject::connect(btn, &QPushButton::toggled, [&, i, pricePreview, tripPrice](bool checked) {
-                if (checked) {
-                    selectedSeats.insert(i);
-                } else {
-                    selectedSeats.erase(i);
-                }
+                if (checked) { selectedSeats.insert(i); } else { selectedSeats.erase(i); }
                 unsigned long totalPrice = selectedSeats.size() * tripPrice;
                 pricePreview->setText(QString("Tổng tiền: %1 VND").arg(totalPrice));
             });
@@ -481,21 +479,21 @@ void UserWindow::onBookTicketClicked() {
     
     QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     layout->addWidget(buttons);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, [&](){ 
-        dlg.accept();
-    });
+    QObject::connect(buttons, &QDialogButtonBox::accepted, [&](){ dlg.accept(); });
     QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     
     if (dlg.exec() != QDialog::Accepted) return;
     
-    QString phone = phoneEdit->text().trimmed();
+    QString inputName = nameEdit->text().trimmed();
+    QString inputPhone = phoneEdit->text().trimmed();
     QString pay = payment->currentText();
     
-    if (selectedSeats.empty()){ QMessageBox::warning(this,"Đặt vé","Chọn ít nhất một ghế"); return; }
-    if (phone.isEmpty()){ QMessageBox::warning(this,"Đặt vé","Nhập số điện thoại"); return; }
+    if (inputName.isEmpty()) { QMessageBox::warning(this,"Đặt vé","Vui lòng nhập họ tên hành khách"); return; }
+    if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Đặt vé","Vui lòng nhập số điện thoại"); return; }
+    if (selectedSeats.empty()){ QMessageBox::warning(this,"Đặt vé","Vui lòng chọn ít nhất một ghế"); return; }
     
     // Determine file based on trip ID: T005 -> TK005.txt
-    std::string fileId = "TK" + tripId.mid(1).toStdString();  // T005 -> 005 -> TK005
+    std::string fileId = "TK" + tripId.mid(1).toStdString(); 
 
     // Scan trip file once to find max ticket ID
     int maxTkNum = 0;
@@ -508,46 +506,34 @@ void UserWindow::onBookTicketClicked() {
                 Ticket t = Ticket::fromCSV(ln);
                 std::string id = t.getId();
                 if (id.rfind("TK", 0) == 0) {
-                    try {
-                        int num = std::stoi(id.substr(2));
-                        if (num > maxTkNum) maxTkNum = num;
-                    } catch (...) {}
+                    try { int num = std::stoi(id.substr(2)); if (num > maxTkNum) maxTkNum = num; } catch (...) {}
                 }
             } catch (...) {}
         }
     }
 
-    std::string phoneStr = phone.toStdString();
+    std::string nameStr = inputName.toStdString();
+    std::string phoneStr = inputPhone.toStdString();
     std::string payStr = pay.toStdString();
     std::string bookedAtStr = (dateStr + " 00:00").toStdString();
     
     try {
-        std::cout << "DEBUG: Saving tickets to file: " << fileId << std::endl;
+        std::string path = std::string("Data/Ticket/") + fileId + ".txt";
 
         // Append all selected seats as separate tickets
-        std::string path = std::string("Data/Ticket/") + fileId + ".txt";
         {
             std::fstream out(path, std::ios::in | std::ios::out | std::ios::app);
-            if (!out.is_open()) {
-                std::cout << "DEBUG: Failed to open file" << std::endl;
-                QMessageBox::critical(this, "Đặt vé", "Không thể lưu vé");
-                return;
-            }
+            if (!out.is_open()) { QMessageBox::critical(this, "Đặt vé", "Không thể lưu vé"); return; }
             out.seekg(0, std::ios::end);
-            std::streampos sz = out.tellg();
-            if (sz > 0) {
-                out.seekg(-1, std::ios::end);
-                char last; out.get(last);
-                if (last != '\n') out << '\n';
-            }
+            if (out.tellg() > 0) { out.seekg(-1, std::ios::end); char last; out.get(last); if (last != '\n') out << '\n'; }
             
             // Create and save tickets for each selected seat
             for (int seatNo : selectedSeats) {
                 maxTkNum++;
                 std::string newId = "TK" + std::string(3 - std::to_string(maxTkNum).length(), '0') + std::to_string(maxTkNum);
-                Ticket tk(newId, tripId.toStdString(), busId, seatNo, userName, phoneStr, tripPrice, bookedAtStr, payStr);
+                Ticket tk(newId, tripId.toStdString(), busId, seatNo, nameStr, phoneStr, tripPrice, bookedAtStr, payStr);
                 out << tk.toCSV() << "\n";
-                
+
                 // Add to memory
                 tickets.push_back(tk);
                 
@@ -564,15 +550,9 @@ void UserWindow::onBookTicketClicked() {
             }
             out.close();
         }
-        std::cout << "DEBUG: All tickets saved successfully" << std::endl;
-        
         unsigned long totalPrice = selectedSeats.size() * tripPrice;
         QMessageBox::information(this, "Đặt vé", QString("Đặt %1 vé thành công! Tổng: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
-    } catch (const std::exception &e) {
-        std::cout << "DEBUG: Exception: " << e.what() << std::endl;
-        QMessageBox::critical(this, "Lỗi", QString("Lỗi khi lưu vé: %1").arg(e.what()));
     } catch (...) {
-        std::cout << "DEBUG: Unknown exception" << std::endl;
         QMessageBox::critical(this, "Lỗi", "Lỗi không xác định khi lưu vé");
     }
 }
