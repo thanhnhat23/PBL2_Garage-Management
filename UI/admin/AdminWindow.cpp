@@ -2033,13 +2033,13 @@ void AdminWindow::onDeleteTripClicked() {
 // ---------- BRAND CRUD ----------
 void AdminWindow::onAddBrandClicked() {
     bool ok;
-    QString name = QInputDialog::getText(this, "Thêm hãng", "Tên hãng:", QLineEdit::Normal, "", &ok);
+    QString name = QInputDialog::getText(this, "Add brand", "Brand name:", QLineEdit::Normal, "", &ok);
     if (!ok || name.isEmpty()) return;
     
-    QString hotline = QInputDialog::getText(this, "Thêm hãng", "Hotline:", QLineEdit::Normal, "", &ok);
+    QString hotline = QInputDialog::getText(this, "Add brand", "Hotline:", QLineEdit::Normal, "", &ok);
     if (!ok || hotline.isEmpty()) return;
     
-    double rating = QInputDialog::getDouble(this, "Thêm hãng", "Đánh giá (0.0-5.0):", 4.0, 0.0, 5.0, 1, &ok);
+    double rating = QInputDialog::getDouble(this, "Add brand", "Rating (0.0-5.0):", 4.0, 0.0, 5.0, 1, &ok);
     if (!ok) return;
     
     // Generate new ID
@@ -2074,13 +2074,13 @@ void AdminWindow::onEditBrandClicked() {
     
     Brand& b = *it;
     bool ok;
-    QString name = QInputDialog::getText(this, "Sửa hãng", "Tên hãng:", QLineEdit::Normal, QString::fromStdString(b.getName()), &ok);
+    QString name = QInputDialog::getText(this, "Edit brand", "Brand name:", QLineEdit::Normal, QString::fromStdString(b.getName()), &ok);
     if (ok && !name.isEmpty()) b.setName(name.toStdString());
     
-    QString hotline = QInputDialog::getText(this, "Sửa hãng", "Hotline:", QLineEdit::Normal, QString::fromStdString(b.getHotline()), &ok);
+    QString hotline = QInputDialog::getText(this, "Edit brand", "Hotline:", QLineEdit::Normal, QString::fromStdString(b.getHotline()), &ok);
     if (ok && !hotline.isEmpty()) b.setHotline(hotline.toStdString());
     
-    double rating = QInputDialog::getDouble(this, "Sửa hãng", "Đánh giá (0.0-5.0):", b.getRating(), 0.0, 5.0, 1, &ok);
+    double rating = QInputDialog::getDouble(this, "Edit brand", "Rating (0.0-5.0):", b.getRating(), 0.0, 5.0, 1, &ok);
     if (ok) b.setRating(rating);
     
     Ultil<Brand>::saveToFile("Data/Brand.txt", brands);
@@ -2095,7 +2095,7 @@ void AdminWindow::onDeleteBrandClicked() {
     int row = table->row(items.first());
     QString brandId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    auto reply = QMessageBox::question(this, "Xác nhận", "Xóa hãng này?");
+    auto reply = QMessageBox::question(this, "Confirm", "Delete this brand?");
     if (reply == QMessageBox::Yes) {
         brands.erase(std::remove_if(brands.begin(), brands.end(),
             [&](const Brand& b){ return b.getId() == brandId.toStdString(); }), brands.end());
@@ -2107,24 +2107,24 @@ void AdminWindow::onDeleteBrandClicked() {
 // ---------- DRIVER CRUD ----------
 void AdminWindow::onAddDriverClicked() {
     if (buses.empty()) {
-        QMessageBox::warning(this, "Lỗi", "Không có xe nào! Vui lòng thêm xe trước.");
+        QMessageBox::warning(this, "Error", "No buses available! Please add a bus first.");
         return;
     }
     
     bool ok;
     QStringList busIds;
     for (const auto& b : buses) busIds << QString::fromStdString(b.getId() + " - " + b.getName());
-    QString busChoice = QInputDialog::getItem(this, "Chọn xe", "Xe:", busIds, 0, false, &ok);
+    QString busChoice = QInputDialog::getItem(this, "Select bus", "Bus:", busIds, 0, false, &ok);
     if (!ok) return;
     QString busId = busChoice.split(" - ").first();
     
-    QString name = QInputDialog::getText(this, "Thêm tài xế", "Tên:", QLineEdit::Normal, "", &ok);
+    QString name = QInputDialog::getText(this, "Add driver", "Name:", QLineEdit::Normal, "", &ok);
     if (!ok || name.isEmpty()) return;
     
-    QString phone = QInputDialog::getText(this, "Thêm tài xế", "SĐT:", QLineEdit::Normal, "", &ok);
+    QString phone = QInputDialog::getText(this, "Add driver", "Phone:", QLineEdit::Normal, "", &ok);
     if (!ok || phone.isEmpty()) return;
     
-    int exp = QInputDialog::getInt(this, "Thêm tài xế", "Kinh nghiệm (năm):", 0, 0, 50, 1, &ok);
+    int exp = QInputDialog::getInt(this, "Add driver", "Experience (years):", 0, 0, 50, 1, &ok);
     if (!ok) return;
     
     std::string lastId = drivers.empty() ? "D000" : drivers.back().getId();
@@ -2153,13 +2153,13 @@ void AdminWindow::onEditDriverClicked() {
     
     Driver& d = *it;
     bool ok;
-    QString name = QInputDialog::getText(this, "Sửa tài xế", "Tên:", QLineEdit::Normal, QString::fromStdString(d.getName()), &ok);
+    QString name = QInputDialog::getText(this, "Edit driver", "Name:", QLineEdit::Normal, QString::fromStdString(d.getName()), &ok);
     if (ok && !name.isEmpty()) d.setName(name.toStdString());
     
-    QString phone = QInputDialog::getText(this, "Sửa tài xế", "SĐT:", QLineEdit::Normal, QString::fromStdString(d.getPhone()), &ok);
+    QString phone = QInputDialog::getText(this, "Edit driver", "Phone:", QLineEdit::Normal, QString::fromStdString(d.getPhone()), &ok);
     if (ok && !phone.isEmpty()) d.setPhone(phone.toStdString());
     
-    int exp = QInputDialog::getInt(this, "Sửa tài xế", "Kinh nghiệm (năm):", d.getExp(), 0, 50, 1, &ok);
+    int exp = QInputDialog::getInt(this, "Driver's advice", "Experience (years):", d.getExp(), 0, 50, 1, &ok);
     if (ok) d.setExp(exp);
     
     Ultil<Driver>::saveToFile("Data/Driver.txt", drivers);
@@ -2174,7 +2174,7 @@ void AdminWindow::onDeleteDriverClicked() {
     int row = table->row(items.first());
     QString driverId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    auto reply = QMessageBox::question(this, "Xác nhận", "Xóa tài xế này?");
+    auto reply = QMessageBox::question(this, "Confirm", "Remove this driver?");
     if (reply == QMessageBox::Yes) {
         drivers.erase(std::remove_if(drivers.begin(), drivers.end(),
             [&](const Driver& d){ return d.getId() == driverId.toStdString(); }), drivers.end());
@@ -2190,7 +2190,7 @@ void AdminWindow::onViewSeatMapClicked() {
     
     auto items = busTable->selectedItems();
     if (items.empty()) {
-        QMessageBox::warning(this, "Lỗi", "Vui lòng chọn một xe từ bảng!");
+        QMessageBox::warning(this, "Error", "Please select a bus from the table!");
         return;
     }
     
@@ -2201,11 +2201,11 @@ void AdminWindow::onViewSeatMapClicked() {
     
     // Ask for date via calendar
     QDialog dateDlg(this);
-    dateDlg.setWindowTitle("Chọn ngày xem ghế");
+    dateDlg.setWindowTitle("Choose a date to view seat map");
     dateDlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
     dateDlg.setMinimumSize(560, 520);
     QVBoxLayout vbox(&dateDlg);
-    QLabel lbl("Chọn ngày khởi hành:", &dateDlg);
+    QLabel lbl("Choose a date:", &dateDlg);
     lbl.setVisible(false);
     QCalendarWidget calendar(&dateDlg);
     calendar.setGridVisible(true);
@@ -2298,7 +2298,7 @@ void AdminWindow::onViewSeatMapClicked() {
     
     // Create seat map dialog
     QDialog *dialog = new QDialog(this);
-    dialog->setWindowTitle("Sơ đồ ghế " + busId + " - " + selectedDate);
+    dialog->setWindowTitle("Seat Map " + busId + " - " + selectedDate);
     dialog->setStyleSheet("background: #0f172a; color: #e5e7eb;");
     dialog->setMinimumSize(500, 600);
     
@@ -2308,7 +2308,7 @@ void AdminWindow::onViewSeatMapClicked() {
     int booked = static_cast<int>(bookedSeats.size());
     int total = static_cast<int>(seatNumbers.size());
     
-    QLabel *lblSummary = new QLabel(QString("Tổng: %1 ghế | Đã đặt: %2 | Trống: %3")
+    QLabel *lblSummary = new QLabel(QString("Total: %1 seats | Booked: %2 | Available: %3")
         .arg(total).arg(booked).arg(total - booked), dialog);
     lblSummary->setStyleSheet("font-size: 14px; font-weight: 600; color: #e5e7eb; padding: 10px; background: #1e293b; border-radius: 8px;");
     lblSummary->setAlignment(Qt::AlignCenter);
@@ -2316,7 +2316,7 @@ void AdminWindow::onViewSeatMapClicked() {
     // Seat table
     QTableWidget *table = new QTableWidget(dialog);
     table->setColumnCount(3);
-    table->setHorizontalHeaderLabels({"Số ghế", "Trạng thái", "Tình trạng"});
+    table->setHorizontalHeaderLabels({"Seat No", "Status", "Availability"});
     table->setStyleSheet(StyleHelper::getTableStyle());
     table->horizontalHeader()->setStretchLastSection(true);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -2329,14 +2329,14 @@ void AdminWindow::onViewSeatMapClicked() {
         int seatNo = seatNumbers[i];
         bool isBooked = bookedSeats.count(seatNo) > 0;
         table->setItem(i, 0, new QTableWidgetItem(QString::number(seatNo)));
-        QString status = isBooked ? "🔴 Đã đặt" : "🟢 Trống";
+        QString status = isBooked ? "🔴 Booked" : "🟢 Empty";
         QTableWidgetItem *statusItem = new QTableWidgetItem(status);
         statusItem->setForeground(QBrush(isBooked ? QColor(239, 68, 68) : QColor(34, 197, 94)));
         table->setItem(i, 1, statusItem);
-        table->setItem(i, 2, new QTableWidgetItem(isBooked ? "Không thể đặt" : "Có thể đặt"));
+        table->setItem(i, 2, new QTableWidgetItem(isBooked ? "Cannot book" : "Can book"));
     }
-    
-    QPushButton *btnClose = new QPushButton("Đóng", dialog);
+
+    QPushButton *btnClose = new QPushButton("Close", dialog);
     btnClose->setStyleSheet(StyleHelper::getSecondaryButtonStyle());
     btnClose->setCursor(Qt::PointingHandCursor);
     connect(btnClose, &QPushButton::clicked, dialog, &QDialog::accept);
@@ -2351,14 +2351,14 @@ void AdminWindow::onViewSeatMapClicked() {
 // ========== TICKET FILTERS ==========
 void AdminWindow::onFilterTicketsByBus() {
     if (buses.empty()) {
-        QMessageBox::warning(this, "Lỗi", "Không có xe nào!");
+        QMessageBox::warning(this, "Error", "No buses available!");
         return;
     }
     
     bool ok;
     QStringList busIds;
     for (const auto& b : buses) busIds << QString::fromStdString(b.getId() + " - " + b.getName());
-    QString busChoice = QInputDialog::getItem(this, "Lọc theo xe", "Chọn xe:", busIds, 0, false, &ok);
+    QString busChoice = QInputDialog::getItem(this, "Filter by bus", "Select bus:", busIds, 0, false, &ok);
     if (!ok) return;
     QString busId = busChoice.split(" - ").first();
     
@@ -2370,7 +2370,7 @@ void AdminWindow::onFilterTicketsByBus() {
     }
     
     if (filtered.empty()) {
-        QMessageBox::information(this, "Kết quả", "Không có vé nào cho xe này.");
+        QMessageBox::information(this, "Result", "No tickets found for this bus.");
         populateTicketsTable();
         return;
     }
@@ -2503,7 +2503,7 @@ void AdminWindow::onBookTicketClicked() {
             if (bus.getId() == busId) { capacity = bus.getCapacity(); break; }
         }
         if (capacity == 0) {
-            cbSeat->addItem("Hết ghế", -1);
+            cbSeat->addItem("Out of seats", -1);
             return;
         }
 
@@ -2518,11 +2518,11 @@ void AdminWindow::onBookTicketClicked() {
         bool anySeat = false;
         for (int seatNo = 1; seatNo <= capacity; ++seatNo) {
             if (booked.count(seatNo) == 0) {
-                cbSeat->addItem(QString("Ghế %1").arg(seatNo), seatNo);
+                cbSeat->addItem(QString("Seat %1").arg(seatNo), seatNo);
                 anySeat = true;
             }
         }
-        if (!anySeat) cbSeat->addItem("Hết ghế", -1);
+        if (!anySeat) cbSeat->addItem("Out of seats", -1);
     };
     connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updateSeats);
     connect(calTrip, &QCalendarWidget::selectionChanged, this, [&, updateSeats](){ updateSeats(); });
@@ -2530,16 +2530,16 @@ void AdminWindow::onBookTicketClicked() {
     
     // Passenger info
     QLineEdit *txtName = new QLineEdit(&dialog);
-    txtName->setPlaceholderText("Tên hành khách");
+    txtName->setPlaceholderText("Passenger name");
     QLineEdit *txtPhone = new QLineEdit(&dialog);
-    txtPhone->setPlaceholderText("Số điện thoại");
+    txtPhone->setPlaceholderText("Phone number");
 
     // Payment method
     QComboBox *cbPayment = new QComboBox(&dialog);
     cbPayment->addItems({"Cash", "Momo", "ZaloPay", "Chuyển khoản"});
     
     // Price calculation label
-    QLabel *lblPrice = new QLabel("Giá: 0 VND", &dialog);
+    QLabel *lblPrice = new QLabel("Price: 0 VND", &dialog);
     lblPrice->setStyleSheet("font-weight: bold; color: #FDB515;");
     
     // Auto-calculate price when trip changes
@@ -2567,18 +2567,18 @@ void AdminWindow::onBookTicketClicked() {
         for (int i = len - 3; i > 0; i -= 3) {
             priceStr.insert(i, ',');
         }
-        lblPrice->setText("Giá: " + priceStr + " VND");
+        lblPrice->setText("Price: " + priceStr + " VND");
         lblPrice->setProperty("price", QVariant::fromValue(static_cast<qulonglong>(price)));
     };
     connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updatePrice);
     updatePrice();
     
-    formLayout->addRow("Chuyến:", cbTrip);
-    formLayout->addRow("Ngày:", calTrip);
-    formLayout->addRow("Ghế:", cbSeat);
-    formLayout->addRow("Hành khách:", txtName);
-    formLayout->addRow("Số điện thoại:", txtPhone);
-    formLayout->addRow("Thanh toán:", cbPayment);
+    formLayout->addRow("Trip:", cbTrip);
+    formLayout->addRow("Date:", calTrip);
+    formLayout->addRow("Seat:", cbSeat);
+    formLayout->addRow("Passenger:", txtName);
+    formLayout->addRow("Phone Number:", txtPhone);
+    formLayout->addRow("Payment Method:", cbPayment);
     formLayout->addRow("", lblPrice);
     
     QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
@@ -2590,11 +2590,11 @@ void AdminWindow::onBookTicketClicked() {
     
     if (dialog.exec() == QDialog::Accepted) {
         if (txtName->text().isEmpty() || txtPhone->text().isEmpty()) {
-            QMessageBox::warning(this, "Lỗi", "Vui lòng nhập đầy đủ thông tin!");
+            QMessageBox::warning(this, "Error", "Please enter all information!");
             return;
         }
         if (cbSeat->count() == 0 || cbSeat->currentData().toInt() == -1) {
-            QMessageBox::warning(this, "Lỗi", "Không còn ghế trống cho chuyến này!");
+            QMessageBox::warning(this, "Error", "No seats available for this trip!");
             return;
         }
         
@@ -2665,7 +2665,7 @@ void AdminWindow::onBookTicketClicked() {
         {
             std::fstream out(ticketPath, std::ios::in | std::ios::out | std::ios::app);
             if (!out.is_open()) {
-                QMessageBox::critical(this, "Lỗi", "Không thể mở file vé để ghi!");
+                QMessageBox::critical(this, "Error", "Cannot open ticket file for writing!");
                 return;
             }
             out.seekg(0, std::ios::end);
@@ -2678,9 +2678,9 @@ void AdminWindow::onBookTicketClicked() {
             out << newTicket.toCSV() << "\n";
             out.close();
         }
-        
-        QMessageBox::information(this, "Thành công", 
-            QString("Đặt vé thành công!\nMã vé: %1").arg(QString::fromStdString(ticketId)));
+
+        QMessageBox::information(this, "Success", 
+            QString("Ticket booked successfully!\nTicket ID: %1").arg(QString::fromStdString(ticketId)));
         loadAllData();
         populateTicketsTable();
     }
@@ -2689,12 +2689,12 @@ void AdminWindow::onBookTicketClicked() {
 void AdminWindow::onCancelTicketClicked() {
     QTableWidget *table = findChild<QTableWidget*>("ticketDetailTable");
     if (!table || !table->selectionModel() || !table->selectionModel()->hasSelection()) {
-        QMessageBox::warning(this, "Lỗi", "Vui lòng chọn vé ở bảng bên phải trước khi hủy!");
+        QMessageBox::warning(this, "Error", "Please select a ticket in the right table before canceling!");
         return;
     }
     auto items = table->selectedItems();
     if (items.empty()) {
-        QMessageBox::warning(this, "Lỗi", "Vui lòng chọn vé cần hủy!");
+        QMessageBox::warning(this, "Error", "Please select a ticket to cancel!");
         return;
     }
     int row = table->row(items.first());
@@ -2714,13 +2714,13 @@ void AdminWindow::onCancelTicketClicked() {
         itTicket = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == selectedId; });
     }
     if (itTicket == tickets.end()) {
-        QMessageBox::warning(this, "Lỗi", "Không tìm thấy vé trong dữ liệu!");
+        QMessageBox::warning(this, "Error", "Ticket not found in data!");
         return;
     }
     int ticketIndex = static_cast<int>(std::distance(tickets.begin(), itTicket));
 
-    auto reply = QMessageBox::question(this, "Xác nhận", 
-        QString("Hủy vé %1?\nHành khách: %2\nGhế: %3")
+    auto reply = QMessageBox::question(this, "Confirm", 
+        QString("Cancel ticket %1?\nPassenger: %2\nSeat: %3")
             .arg(QString::fromStdString(itTicket->getId()))
             .arg(QString::fromStdString(itTicket->getPassengerName()))
             .arg(itTicket->getSeatNo()));
@@ -2771,7 +2771,7 @@ void AdminWindow::onCancelTicketClicked() {
             }
         }
         
-        QMessageBox::information(this, "Thành công", "Đã hủy vé thành công!");
+        QMessageBox::information(this, "Success!", "Ticket cancellation successful!");
         loadAllData();
         populateTicketsTable();
     }
