@@ -1,4 +1,5 @@
 #include "UserWindow.h"
+#include "../Class/FareCalculator.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -411,7 +412,19 @@ void UserWindow::onBookTicketClicked() {
     for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; } }
     if (busId.empty()) { QMessageBox::warning(this, "Book ticket", "Error: Bus not found"); return; }
     int capacity = 40; for (const auto &b : buses){ if (b.getId()==busId) { capacity = b.getCapacity(); break; } }
-    for (const auto &r : routes){ for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString() && tr.getRouteId()==r.getId()){ try { tripPrice = std::stol(r.getDistance()) * 1000; } catch(...) { tripPrice = 100000; } break; } } }
+    for (const auto &r : routes){
+         for (const auto &tr : trips){ 
+            if (tr.getId()==tripId.toStdString() && tr.getRouteId()==r.getId()){ 
+                try{ 
+                        tripPrice = FareCalculator::calculate(std::stol(r.getDistance())); 
+                } 
+                catch(...){ 
+                    tripPrice = FareCalculator::MIN_FARE; 
+                } 
+                break; 
+            } 
+        } 
+    }
     
     QString dateStr = calendar->selectedDate().toString("yyyy-MM-dd");
     std::set<int> booked;

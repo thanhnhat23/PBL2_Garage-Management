@@ -1,4 +1,3 @@
-// File: main.cpp  (FULL)
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -25,6 +24,7 @@
 #include "Class/Auth.h"
 #include "Class/ConsoleMenu.h"
 #include "Class/Table.h" 
+#include "Class/FareCalculator.h"
 
 namespace fs = std::filesystem;
 using namespace std;
@@ -1400,8 +1400,7 @@ static void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
         for (const auto& r : routes) {
             long distance = 0;
             try { distance = stol(r.getDistance()); } catch(...) {}
-            long price = distance * 1000;
-            if (price < 50000) price = 50000;
+            long price = FareCalculator::calculate(distance);
 
             cout << left << setw(10) << r.getId() 
                  << setw(30) << r.getName() 

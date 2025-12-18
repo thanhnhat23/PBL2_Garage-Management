@@ -1,4 +1,5 @@
 #include "AdminWindow.h"
+#include "../Class/FareCalculator.h"
 #include "StyleHelper.h"
 #include "CRUDDialogs.h"
 #include <QVBoxLayout>
@@ -2552,9 +2553,9 @@ void AdminWindow::onBookTicketClicked() {
                     if (route.getId() == trip.getRouteId()) {
                         try {
                             int distance = std::stoi(route.getDistance());
-                            price = distance * 1000; // 1000 VND per km
+                            price = FareCalculator::calculate(distance);
                         } catch (...) {
-                            price = 100000; // Default if parsing fails
+                            price = FareCalculator::MIN_FARE;
                         }
                         break;
                     }

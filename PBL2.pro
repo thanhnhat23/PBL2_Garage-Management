@@ -36,6 +36,7 @@ SOURCES += \
     Function/Trip.cpp \
     Function/Ultil.cpp \
     Function/User.cpp \
+    Function/FareCalculator.cpp \
     UI/windows/MainWindow.cpp \
     UI/auth/LoginWindowNew.cpp \
     UI/admin/AdminWindow.cpp \
@@ -57,6 +58,7 @@ HEADERS += \
     Class/Trip.h \
     Class/Ultil.h \
     Class/User.h \
+    Class/FareCalculator.h \
     UI/windows/MainWindow.h \
     UI/auth/LoginWindowNew.h \
     UI/admin/AdminWindow.h \
