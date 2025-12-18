@@ -29,6 +29,33 @@
 namespace fs = std::filesystem;
 using namespace std;
 
+static bool isDateInPast(const string& dateStr) {
+    if (dateStr.size() != 10 || dateStr[4] != '-' || dateStr[7] != '-') return false;
+    
+    int y, m, d;
+    try {
+        y = stoi(dateStr.substr(0, 4));
+        m = stoi(dateStr.substr(5, 2));
+        d = stoi(dateStr.substr(8, 2));
+    } catch(...) { return false; } 
+
+    auto now = chrono::system_clock::now();
+    time_t t = chrono::system_clock::to_time_t(now);
+    tm ltm;
+#ifdef _WIN32
+    localtime_s(&ltm, &t);
+#else
+    ltm = *localtime(&t);
+#endif
+    int curY = 1900 + ltm.tm_year;
+    int curM = 1 + ltm.tm_mon;
+    int curD = ltm.tm_mday;
+
+    long inputDate = y * 10000 + m * 100 + d;
+    long currentDate = curY * 10000 + curM * 100 + curD;
+
+    return inputDate < currentDate;
+}
 // ---------- Helpers ----------
 static string toLowerStr(string s) {
     transform(s.begin(), s.end(), s.begin(),
@@ -1450,7 +1477,19 @@ static void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
         string travelDate;
         cout << "\n--- 3. ENTER DATE ---\n";
         cout << "Enter Date (YYYY-MM-DD): "; getline(cin, travelDate);
-        if (travelDate.size() != 10) { cout << "(!) Invalid date format.\n"; system("pause"); return; }
+        while (true) {
+            cout << "Enter Date (YYYY-MM-DD): "; 
+            getline(cin, travelDate);
+            if (travelDate.size() != 10 || travelDate[4] != '-' || travelDate[7] != '-') { 
+                cout << "(!) Invalid date format. Please use format YYYY-MM-DD (e.g., 2025-12-30).\n"; 
+                continue; 
+            }
+            if (isDateInPast(travelDate)) {
+                cout << "Cannot book ticket for a past date. Please enter today or a future date.\n";
+                continue;
+            }
+            break;
+        }
 
         const Bus* currentBus = nullptr;
         for (const auto& b : buses) if (b.getId() == selectedTrip->getBusId()) { currentBus = &b; break; }
