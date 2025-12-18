@@ -98,41 +98,34 @@ static void createAccount(vector<User>& users) {
     flushConsoleEvents();
 
     string uname, pwd, confirm, phone;
-
-    while (true) {
-        cout << "Username (>= 3 ky tu, khong dau): ";
+    while (true) {  
+        cout << "Username (>= 3 characters, without accents): ";
         getline(cin, uname);
-        if (uname.size() < 3) { cout << "Qua ngan. Thu lai.\n"; continue; }
-        if (usernameExists(users, uname)) { cout << "Username da ton tai. Thu ten khac.\n"; continue; }
+        if (uname.size() < 3) { cout << "Pass through.\n"; continue; }
+        if (usernameExists(users, uname)) { cout << "The username already exists. Try a different name.\n"; continue; }
         break;
     }
-    
     cout << "Password (>= 4 ky tu): "; getline(cin, pwd);
     cout << "Confirm  : "; getline(cin, confirm);
     if (pwd.size() < 4 || pwd != confirm) {
-        cout << "Password khong hop le/khong trung. Huy tao tai khoan.\n";
+        cout << "Invalid/unusual password.\n";
         system("pause"); return;
     }
-
     cout << "Phone Number: "; getline(cin, phone);
     if (phone.empty()) {
-        cout << "SĐT khong duoc de trong.\n";
+        cout << "Phone numbers should not be left blank!\n";
         system("pause"); return;
     }
 
     string uid = nextUserId(users);
     
-    users.push_back(User(uid, uname, pwd, Role::USER, phone)); 
+    users.push_back(User(uid, uname, pwd, Role::USER, phone));
 
     ofstream fout("Data/User.txt");
     for (auto &u : users) fout << u.toCSV() << "\n";
     fout.close();
 
-    cout << "\nTao tai khoan thanh cong!\n"
-         << "  ID: " << uid << "\n"
-         << "  Username: " << uname << "\n"
-         << "  Phone: " << phone << "\n"
-         << "  Role: USER\n\n";
+    cout << "\nAccount created successfully!\nID: " << uid << "\nPhone: " << phone << "\n\n";
     system("pause");
 }
 
@@ -1387,288 +1380,161 @@ static void menuTicketStats(const vector<Ticket>& tickets,
 }
 // ---------------- BOOK / CANCEL ----------------
 static void menuBooking(vector<Route>& routes, const vector<Trip>& trips,
-                         const vector<Bus>& buses, vector<Seat>& seats,
-                         vector<Ticket>& tickets) {
+                        const vector<Bus>& buses, vector<Seat>& seats,
+                        vector<Ticket>& tickets) {
     int sel = ConsoleMenu::pick("BOOKING / CANCEL TICKET",
-                                 { "Book new ticket", "Cancel ticket", "Back" });
+                                { "Book new ticket", "Cancel ticket", "Back" });
     if (sel == -1 || sel == 2) return;
 
-    if (sel == 0) { // BOOK
+    if (sel == 0) {
         ui::DrawPanel("BOOK NEW TICKET");
         flushConsoleEvents();
 
-        string name, phone, from, to;
-        int payChoice;
-        cout << "Passenger name: "; getline(cin, name);
-        if (name.empty()) { return; }
-        cout << "Phone number : "; getline(cin, phone);
-        if (phone.empty()) { return; }
-        cout << "From           : "; getline(cin, from);
-        if (from.empty()) { return; }
-        cout << "To             : "; getline(cin, to);
-        if (to.empty()) { return; }
-
-        string routeId; const Route* bookedRoute = nullptr;
-        for (const auto& r : routes)
-            if (toLowerStr(r.getStart()) == toLowerStr(from) &&
-                toLowerStr(r.getEnd())   == toLowerStr(to))
-            { routeId = r.getId(); bookedRoute = &r; break; }
+        if (routes.empty()) { cout << "No routes available.\n"; system("pause"); return; }
         
-        if (routeId.empty()) { cout << "\nNo route found.\n"; system("pause"); return; }
-        vector<const Trip*> foundTrips;
-        for (const auto& t : trips) 
-            if (toLowerStr(t.getRouteId()) == toLowerStr(routeId)) 
-                foundTrips.push_back(&t);
+        cout << "\n--- 1. SELECT ROUTE ---\n";
+        cout << left << setw(10) << "ID" << setw(30) << "Route Name" 
+             << setw(10) << "KM" << setw(15) << "Price (VND)" << "\n";
+        cout << string(70, '-') << "\n";
         
-        if (foundTrips.empty()) { cout << "\nNo trips for this route.\n"; system("pause"); return; }
+        for (const auto& r : routes) {
+            long distance = 0;
+            try { distance = stol(r.getDistance()); } catch(...) {}
+            long price = distance * 1000;
+            if (price < 50000) price = 50000;
 
-        bool hasVip = false;
-        bool hasStandard = false;
-        for (const auto& t : foundTrips) {
-            for (const auto& b : buses) {
-                if (t->getBusId() == b.getId()) {
-                    if (toLowerStr(b.getType()) == "vip") hasVip = true;
-                    if (toLowerStr(b.getType()) == "standard") hasStandard = true;
-                    break; 
-                }
-            }
-            if (hasVip && hasStandard) break;
+            cout << left << setw(10) << r.getId() 
+                 << setw(30) << r.getName() 
+                 << setw(10) << r.getDistance()
+                 << setw(15) << price << "\n";
         }
 
-        string seatType;
-        int seatTypeChoice;
-
-        if (hasVip && hasStandard) {
-            cout << "Seat type (1=VIP, 0=Standard): ";
-            cin >> seatTypeChoice; cin.ignore(numeric_limits<streamsize>::max(), '\n');
-            seatType = (seatTypeChoice == 1 ? "VIP" : "Standard");
-        } else if (hasVip) {
-            cout << "Seat type: VIP (Only option available for this route)\n";
-            seatType = "VIP";
-        } else if (hasStandard) {
-            cout << "Seat type: Standard (Only option available for this route)\n";
-            seatType = "Standard";
-        } else {
-            cout << "\nNo available seat types (VIP/Standard) found for this route.\n";
-            system("pause");
-            return;
-        }
-
-        cout << "Payment (1=Chuyen khoan, 2=Tien mat, 3=ZaloPay): ";
-        cin >> payChoice; cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        string payMethod = (payChoice==1?"Chuyen khoan":(payChoice==2?"Tien mat":"ZaloPay"));
-
-
-        // 4 Shows available trips matching seat type
-        cout << "\nAvailable trips (Matching your " << seatType << " choice):\n";
-        cout << left << setw(8) << "TripID" << setw(8) << "Bus"
-             << setw(10) << "Depart" << setw(10) << "Arrive" << "\n";
+        string routeId;
+        cout << "\nEnter Route ID (e.g. R001): "; getline(cin, routeId);
         
-        int tripsDisplayed = 0;
-        for (auto t : foundTrips) { 
-            for (const auto& b : buses)
-                if (b.getId() == t->getBusId() &&
-                    toLowerStr(b.getType()) == toLowerStr(seatType)) { // match seat type
-                    string seatFile = "Data/Seat/" + b.getId() + ".txt";
-                    ifstream fs(seatFile); string line; bool hasEmpty=false;
-                    while (getline(fs, line)) {
-                        auto v = splitCSV(line);
-                        if (v.size() >= 3 && v[2] == "0") { hasEmpty = true; break; }
-                    }
-                    fs.close();
-                    if (hasEmpty) {
-                        cout << left << setw(8) << t->getId()
-                             << setw(8) << b.getId()
-                             << setw(10) << t->getDepart()
-                             << setw(10) << t->getArrival() << "\n";
-                        tripsDisplayed++;
-                    }
-                }
-        }
-        
-        if (tripsDisplayed == 0) {
-            cout << "\nNo available trips found for the selected route with a '" << seatType << "' bus.\n";
-            cout << "The bus might be full, or only offers the other seat type.\n";
-            system("pause");
-            return;
-        }
-
-        flushConsoleEvents();
-        cout << "\nTrip ID to book: ";
-        string tripId; getline(cin, tripId);
-
-        const Trip* chosen = nullptr;
-        for (const auto& t : trips)
-            if (toLowerStr(t.getId()) == toLowerStr(tripId)) { chosen = &t; break; }
-        if (!chosen) { cout << "Invalid trip.\n"; system("pause"); return; }
-
-        string busId = chosen->getBusId();
-        string seatPath = "Data/Seat/" + busId + ".txt";
-
-        vector<int> emptySeats; ifstream fs(seatPath); string line;
-        cout << "\nEmpty seats: ";
-        while (getline(fs, line)) {
-            auto v = splitCSV(line);
-            if (v.size() >= 3 && v[2] == "0") {
-                cout << v[1] << " ";
-                try { emptySeats.push_back(stoi(v[1])); } catch(...) {}
-            }
-        }
-        fs.close();
-
-        cout << "\nSeat number: ";
-        string seatNoStr; getline(cin, seatNoStr);
-        int seatNo = -1; try { seatNo = stoi(seatNoStr); } catch (...) {}
-        if (seatNo < 0 || find(emptySeats.begin(), emptySeats.end(), seatNo) == emptySeats.end()) {
-            cout << "Invalid or already booked seat.\n"; system("pause"); return;
-        }
-
-        unsigned long price = 0;
-        if (bookedRoute) {
-            try {
-                double d = stod(ensureSuffix(bookedRoute->getDistance(), ""));
-                price = (d <= 50) ? (unsigned long)(d * 1000)
-                                  : (unsigned long)(50*1000 + (d - 50) * 1500);
-            } catch (...) { /* keep 0 */ }
-        }
-        string bookedAt = nowStr(); 
-
-        // pick ticket file
-        string tkFile;
-        for (int i = 1; i <= 20; i++) {
-            stringstream ss; ss << "Data/Ticket/TK" << setw(3) << setfill('0') << i << ".txt";
-            ifstream test(ss.str()); string temp;
-            if (!test.is_open()) continue;
-            getline(test, temp);
-            if (!temp.empty() &&
-                temp.find(chosen->getId()) != string::npos &&
-                temp.find(busId) != string::npos) { tkFile = ss.str(); break; }
-        }
-        if (tkFile.empty()) tkFile = "Data/Ticket/TK001.txt";
-
-        // new ticket id
-        vector<string> lines; ifstream fin(tkFile);
-        while (getline(fin, line)) if (!line.empty()) lines.push_back(line);
-        fin.close();
-        string lastId = lines.empty()? "TK000" : splitCSV(lines.back())[0];
-        int next = 0; try { next = stoi(lastId.substr(2)) + 1; } catch(...) {}
-        stringstream nid; nid << "TK" << setw(3) << setfill('0') << next; string tid = nid.str();
-
-        string newLine = tid + "," + chosen->getId() + "," + busId + "," + seatNoStr + ","
-                         + name + "," + phone + "," + to_string(price) + "," + bookedAt + "," + payMethod;
-        lines.push_back(newLine);
-        ofstream fout(tkFile, ios::trunc); for (auto &l : lines) fout << l << "\n"; fout.close();
-
-        // update seat file
-        vector<string> updated; ifstream fs2(seatPath);
-        while (getline(fs2, line)) {
-            if (line.empty()) continue;
-            auto v = splitCSV(line);
-            if (v.size() >= 3 && v[1] == seatNoStr) v[2] = "1";
-            updated.push_back(v[0]+","+v[1]+","+v[2]);
-        }
-        fs2.close();
-        ofstream fout2(seatPath, ios::trunc); for (auto &s : updated) fout2 << s << "\n"; fout2.close();
-        for (auto &s : seats) if (s.getBusId() == busId && s.getSeatNo() == seatNo) { s.setStatus(true); break; }
-        tickets.push_back(Ticket::fromCSV(newLine));
-
-        cout << "\nBooked successfully. Ticket ID: " << tid << "\n";
-        
-        cout << "\n===== TICKET CONFIRMATION =====\n";
-        
-        const Bus* bookedBus = nullptr;
-        for (const auto& b : buses) {
-            if (b.getId() == busId) {
-                bookedBus = &b;
+        const Route* selectedRoute = nullptr;
+        for (const auto& r : routes) {
+            if (toLowerStr(r.getId()) == toLowerStr(routeId)) {
+                selectedRoute = &r;
                 break;
             }
         }
+        if (!selectedRoute) { cout << "(!) Route ID not found.\n"; system("pause"); return; }
 
-        cout << left << setw(15) << "Ticket ID:" << tid << "\n";
-        cout << left << setw(15) << "Passenger:" << name << " (" << phone << ")\n";
+        vector<const Trip*> routeTrips;
+        for (const auto& t : trips) {
+            if (toLowerStr(t.getRouteId()) == toLowerStr(selectedRoute->getId())) {
+                routeTrips.push_back(&t);
+            }
+        }
 
-        if (bookedRoute) {
-            cout << left << setw(15) << "Route:" << bookedRoute->getName() << " (" << bookedRoute->getStart() << " -> " << bookedRoute->getEnd() << ")\n";
+        if (routeTrips.empty()) { cout << "(!) No trips available for this route.\n"; system("pause"); return; }
+
+        cout << "\n--- 2. SELECT TRIP ---\n";
+        cout << left << setw(10) << "ID" << setw(10) << "Bus" << setw(15) << "Depart" << setw(15) << "Arrive" << "\n";
+        cout << string(60, '-') << "\n";
+        for (const auto* t : routeTrips) {
+            cout << left << setw(10) << t->getId()
+                 << setw(10) << t->getBusId()
+                 << setw(15) << t->getDepart()
+                 << setw(15) << t->getArrival() << "\n";
         }
-        if (bookedBus) {
-            cout << left << setw(15) << "Bus License:" << bookedBus->getName() << " (ID: " << busId << ")\n";
+
+        string tripId;
+        cout << "\nEnter Trip ID (e.g. T001): "; getline(cin, tripId);
+        const Trip* selectedTrip = nullptr;
+        for (const auto* t : routeTrips) {
+            if (toLowerStr(t->getId()) == toLowerStr(tripId)) { selectedTrip = t; break; }
         }
+        if (!selectedTrip) { cout << "(!) Invalid Trip ID.\n"; system("pause"); return; }
+
+        string travelDate;
+        cout << "\n--- 3. ENTER DATE ---\n";
+        cout << "Enter Date (YYYY-MM-DD): "; getline(cin, travelDate);
+        if (travelDate.size() != 10) { cout << "(!) Invalid date format.\n"; system("pause"); return; }
+
+        const Bus* currentBus = nullptr;
+        for (const auto& b : buses) if (b.getId() == selectedTrip->getBusId()) { currentBus = &b; break; }
         
-        cout << left << setw(15) << "Seat Number:" << seatNoStr << " (Type: " << seatType << ")\n";
-        cout << left << setw(15) << "Departure:" << chosen->getDepart() << "\n";
-        cout << left << setw(15) << "Arrival:" << chosen->getArrival() << "\n";
-        cout << left << setw(15) << "Price:" << price << " VND\n";
-        cout << left << setw(15) << "Booked At:" << bookedAt << "\n";
-        cout << left << setw(15) << "Payment:" << payMethod << "\n";
-        cout << "=================================\n";
+        vector<int> bookedSeats;
+        for (const auto& tk : tickets) {
+            if (tk.getTripId() == selectedTrip->getId() && tk.getBookedAt().find(travelDate) == 0) {
+                bookedSeats.push_back(tk.getSeatNo());
+            }
+        }
 
-        cout << "\n"; system("pause");
+        cout << "\n--- 4. SELECT SEAT (Bus: " << currentBus->getName() << ") ---\n";
+        int capacity = currentBus->getCapacity();
+        for (int i = 1; i <= capacity; i++) {
+            bool isBooked = false;
+            for (int bs : bookedSeats) if (bs == i) isBooked = true;
+            if (isBooked) cout << "[ X] "; else cout << "[" << setw(2) << i << "] ";
+            if (i % 4 == 0) cout << "\n";
+        }
+        cout << "\n";
+
+        string seatStr; cout << "Enter Seat Number: "; getline(cin, seatStr);
+        int seatNo = 0; try { seatNo = stoi(seatStr); } catch(...) {}
+        if (seatNo < 1 || seatNo > capacity) { cout << "(!) Seat number invalid.\n"; system("pause"); return; }
+        for (int bs : bookedSeats) if (bs == seatNo) { cout << "(!) Seat already booked.\n"; system("pause"); return; }
+
+        string name, phone;
+        cout << "\n--- 5. PASSENGER INFO ---\n";
+        cout << "Name: "; getline(cin, name);
+        if (name.empty()) return;
+        cout << "Phone: "; getline(cin, phone);
+        if (phone.empty()) return;
+
+        int payOpt;
+        cout << "Payment (1: Cash, 2: Bank Transfer, 3: Momo): "; 
+        string payStr; getline(cin, payStr);
+        try { payOpt = stoi(payStr); } catch(...) { payOpt=1; }
+        string payment = (payOpt == 2) ? "Bank Transfer" : (payOpt == 3 ? "Momo" : "Cash");
+
+        unsigned long finalPrice = 0;
+        try { 
+            long dist = stol(selectedRoute->getDistance());
+            finalPrice = dist * 1000;
+            if (finalPrice < 50000) finalPrice = 50000;
+        } catch(...) { finalPrice = 50000; }
+
+        string lastId = tickets.empty() ? "TK000" : tickets.back().getId();
+        int nextId = 0; try { nextId = stoi(lastId.substr(2)) + 1; } catch(...) {}
+        stringstream ss; ss << "TK" << setw(3) << setfill('0') << nextId;
+        string ticketId = ss.str();
+        string bookedAt = travelDate + " " + nowStr().substr(11);
+
+        Ticket newTk(ticketId, selectedTrip->getId(), currentBus->getId(), seatNo, 
+                     name, phone, finalPrice, bookedAt, payment);
+        
+        tickets.push_back(newTk);
+        ofstream f("Data/Ticket/TK001.txt", ios::app);
+        f << newTk.toCSV() << "\n";
+        f.close();
+
+        cout << "\n>>> BOOKING SUCCESSFUL! <<<\n";
+        cout << "Ticket ID: " << ticketId << " | Seat: " << seatNo << "\n";
+        cout << "Route: " << selectedRoute->getName() << " (" << selectedRoute->getDistance() << " km)\n";
+        cout << "PRICE: " << finalPrice << " VND\n";
+        system("pause");
     }
-    else if (sel == 1) { // CANCEL
+    else if (sel == 1) {
         ui::DrawPanel("CANCEL TICKET");
         flushConsoleEvents();
-        cout << "Passenger name: "; string name; getline(cin, name);
-        if (name.empty()) { return; }
-        cout << "Phone number  : "; string phone; getline(cin, phone);
-        if (phone.empty()) { return; }
-
-        bool found = false; string busId, seatNo; int seatNoInt = -1;
-        string tkPath = ""; 
-
-        for (int i = 1; i <= 20; i++) {
-            stringstream ss; ss << "Data/Ticket/TK" << setw(3) << setfill('0') << i << ".txt";
-            string path = ss.str(); ifstream fin(path); if (!fin.is_open()) continue;
-
-            vector<string> lines; string l; while (getline(fin, l)) if (!l.empty()) lines.push_back(l); fin.close();
-            vector<string> keep;
-
-            for (auto &ln : lines) {
-                auto v = splitCSV(ln);
-                if (v.size() < 9) { keep.push_back(ln); continue; }
-                if (toLowerStr(v[4]) == toLowerStr(name) && toLowerStr(v[5]) == toLowerStr(phone)) {
-                    busId = v[2]; seatNo = v[3];
-                    try { seatNoInt = stoi(v[3]); } catch(...) {}
-                    found = true; 
-                    tkPath = path;
-                    continue;
-                }
-                keep.push_back(ln);
-            }
-            if (found) { 
-                ofstream fout(path, ios::trunc);
-                for (auto &l2 : keep) fout << l2 << "\n"; fout.close(); 
-                
-                for (auto it = tickets.begin(); it != tickets.end(); ++it) {
-                    if (toLowerStr(it->getPassengerName()) == toLowerStr(name) &&
-                        toLowerStr(it->getPhoneNumber()) == toLowerStr(phone) &&
-                        it->getBusId() == busId &&
-                        it->getSeatNo() == seatNoInt) 
-                    {
-                        tickets.erase(it);
-                        break; 
-                    }
-                }
-                break; 
+        cout << "Enter Ticket ID to cancel: ";
+        string tid; getline(cin, tid);
+        
+        bool found = false;
+        for (auto it = tickets.begin(); it != tickets.end(); ++it) {
+            if (toLowerStr(it->getId()) == toLowerStr(tid)) {
+                tickets.erase(it); 
+                found = true;
+                cout << "Ticket removed from memory (RAM). For permanent deletion, please use Admin UI.\n";
+                break;
             }
         }
-        if (found && !busId.empty()) {
-            string seatPath = "Data/Seat/" + busId + ".txt";
-            vector<string> updated; ifstream fs(seatPath); string line;
-            while (getline(fs, line)) {
-                if (line.empty()) continue; auto v = splitCSV(line);
-                if (v.size() >= 3 && v[1] == seatNo) v[2] = "0";
-                updated.push_back(v[0]+","+v[1]+","+v[2]);
-            }
-            fs.close();
-            ofstream fout2(seatPath, ios::trunc); for (auto &s : updated) fout2 << s << "\n"; fout2.close();
-            for (auto &s : seats) if (s.getBusId() == busId && s.getSeatNo() == seatNoInt) { s.setStatus(false); break; }
-            
-            cout << "\nCanceled ticket for (" << name << ", " << phone << ").\n";
-            cout << "Updated file: " << tkPath << "\n";
-        } else {
-            cout << "No matching ticket.\n";
-        }
-        cout << "\n"; system("pause");
+        if (!found) cout << "Ticket ID not found.\n";
+        system("pause");
     }
 }
 // ---------------- TRIP MENU ----------------
@@ -1899,13 +1765,64 @@ static void adminMenu(AuthManager& auth,
         else if (sel == 10) { auth.logout(); exit(0); }
     }
 }
+static void viewMyTickets(const User& currentUser, const vector<Ticket>& tickets, 
+                          const vector<Trip>& trips, const vector<Route>& routes) {
+    ui::DrawPanel("MY TICKETS");
+    
+    string myName = currentUser.getUsername();
+    string myPhone = currentUser.getPhoneNumber();
+    cout << left << setw(10) << "TicketID" << setw(20) << "Route" << setw(15) << "Date/Time" 
+         << setw(5) << "Seat" << setw(15) << "Price" << setw(15) << "Passenger" << "\n";
+    cout << string(85, '-') << "\n";
+
+    bool found = false;
+    for (const auto& tk : tickets) {
+        bool matchName = (toLowerStr(tk.getPassengerName()) == toLowerStr(myName));
+        bool matchPhone = (!myPhone.empty() && tk.getPhoneNumber() == myPhone);
+
+        if (matchName || matchPhone) {
+            string routeName = tk.getTripId(); 
+            for(const auto& t : trips) {
+                if(t.getId() == tk.getTripId()) {
+                    for(const auto& r : routes) {
+                        if(r.getId() == t.getRouteId()) {
+                            routeName = r.getStart() + " -> " + r.getEnd();
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            cout << left << setw(10) << tk.getId()
+                 << setw(20) << routeName.substr(0, 19)
+                 << setw(15) << tk.getBookedAt().substr(0, 14)
+                 << setw(5) << tk.getSeatNo()
+                 << setw(15) << tk.getPrice()
+                 << setw(15) << tk.getPassengerName() << "\n";
+            found = true;
+        }
+    }
+
+    if (!found) cout << "\n(You have no tickets, or your tickets haven't been synchronized with your phone number)\n";
+    cout << "\n"; system("pause");
+}
+
 static void userMenu(AuthManager& auth,
-              vector<Route>& routes, const vector<Trip>& trips,
-              const vector<Bus>& buses, const vector<Driver>& drivers,
-              vector<Seat>& seats, vector<Ticket>& tickets) {
+                     vector<Route>& routes, const vector<Trip>& trips,
+                     const vector<Bus>& buses, const vector<Driver>& drivers,
+                     vector<Seat>& seats, vector<Ticket>& tickets) {
     while (auth.isLoggedIn() && !auth.isAdmin()) {
-        int sel = ConsoleMenu::pick("MAIN MENU (USER)", { "Booking / Cancel", "View Bus Info", "Logout", "Exit" });
+        int sel = ConsoleMenu::pick("MAIN MENU (USER)", { 
+            "Booking / Cancel", 
+            "View Bus Info", 
+            "View My Tickets",
+            "Logout", 
+            "Exit" 
+        });
+
         if (sel == -1) continue;
+        
         if (sel == 0) {
             menuBooking(routes, trips, buses, seats, tickets);
         }
@@ -1916,8 +1833,16 @@ static void userMenu(AuthManager& auth,
             renderBusDetails(buses[idx], drivers, seats, routes, trips);
             cout << "\n"; system("pause");
         }
-        else if (sel == 2) { auth.logout(); break; }
-        else if (sel == 3) { auth.logout(); exit(0); }
+        else if (sel == 2) {
+            const User* u = auth.getCurrentUser(); 
+            if (u) {
+                viewMyTickets(*u, tickets, trips, routes);
+            } else {
+                cout << "User authentication error.\n"; system("pause");
+            }
+        }
+        else if (sel == 3) { auth.logout(); break; }
+        else if (sel == 4) { auth.logout(); exit(0); }
     }
 }
 
@@ -1953,8 +1878,8 @@ int main() {
     // Users
     vector<User> users = loadData("Data/User.txt", User::fromCSV);
     if (users.empty()) {
-        users.push_back(User("U001", "admin", "admin123", Role::ADMIN));
-        users.push_back(User("U002", "user1", "123456",   Role::USER));
+        users.push_back(User("U001", "admin", "admin123", Role::ADMIN, "999"));
+        users.push_back(User("U002", "user1", "123456", Role::USER, "000"));
         ofstream fout("Data/User.txt"); for (auto &u : users) fout << u.toCSV() << "\n"; fout.close();
     }
 

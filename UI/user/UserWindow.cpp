@@ -286,19 +286,19 @@ void UserWindow::setupTabs() {
     tripTable = new QTableWidget(tripsTab);
     tripTable->setStyleSheet(StyleHelper::getTableStyle());
     tripTable->setColumnCount(5);
-    tripTable->setHorizontalHeaderLabels({"ID","Tuyến","Xe","Giờ đi","Giờ đến"});
+    tripTable->setHorizontalHeaderLabels({"ID", "Route", "Bus", "Departure Time", "Arrival Time"});
     tripTable->horizontalHeader()->setStretchLastSection(true);
     tripTable->verticalHeader()->setVisible(false);
     tripTable->setSelectionBehavior(QAbstractItemView::SelectRows);
         tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
     tLayout->addWidget(tripTable);
-    QPushButton *btnBook = new QPushButton("Đặt vé", tripsTab);
+    QPushButton *btnBook = new QPushButton("Book tickets", tripsTab);
     btnBook->setIcon(renderSvgIcon(":/icons/icons/ticket-add.svg", QSize(16,16), "#22c55e"));
     btnBook->setIconSize(QSize(16,16));
     btnBook->setStyleSheet(StyleHelper::getSuccessButtonStyle());
     btnBook->setCursor(Qt::PointingHandCursor);
     connect(btnBook, &QPushButton::clicked, this, &UserWindow::onBookTicketClicked);
-    QPushButton *btnViewSeat = new QPushButton("Xem sơ đồ ghế", tripsTab);
+    QPushButton *btnViewSeat = new QPushButton("View seat map", tripsTab);
     btnViewSeat->setIcon(renderSvgIcon(":/icons/icons/seat-map.svg", QSize(16,16), "#3b82f6"));
     btnViewSeat->setIconSize(QSize(16,16));
     btnViewSeat->setStyleSheet(StyleHelper::getPrimaryButtonStyle());
@@ -309,7 +309,7 @@ void UserWindow::setupTabs() {
     actions->addWidget(btnViewSeat);
     actions->addStretch();
     tLayout->addLayout(actions);
-    tabWidget->addTab(tripsTab, "Chuyến");
+    tabWidget->addTab(tripsTab, "Trips");
 
     // My Tickets tab
     QWidget *myTab = new QWidget(this);
@@ -317,20 +317,20 @@ void UserWindow::setupTabs() {
     myTicketsTable = new QTableWidget(myTab);
     myTicketsTable->setStyleSheet(StyleHelper::getTableStyle());
     myTicketsTable->setColumnCount(7);
-    myTicketsTable->setHorizontalHeaderLabels({"ID","Chuyến","Ghế","Khách","SĐT","Giá","Thời gian"});
+    myTicketsTable->setHorizontalHeaderLabels({"ID","Trip","Seat","Passenger","Phone","Price","Time"});
     myTicketsTable->horizontalHeader()->setStretchLastSection(true);
     myTicketsTable->verticalHeader()->setVisible(false);
     myTicketsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
         myTicketsTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
     mLayout->addWidget(myTicketsTable);
-    QPushButton *btnCancel = new QPushButton("Hủy vé", myTab);
+    QPushButton *btnCancel = new QPushButton("Cancel ticket", myTab);
     btnCancel->setIcon(renderSvgIcon(":/icons/icons/ticket-cancel.svg", QSize(16,16), "#ef4444"));
     btnCancel->setIconSize(QSize(16,16));
     btnCancel->setStyleSheet(StyleHelper::getDangerButtonStyle());
     btnCancel->setCursor(Qt::PointingHandCursor);
     connect(btnCancel, &QPushButton::clicked, this, &UserWindow::onCancelMyTicketClicked);
     mLayout->addWidget(btnCancel, 0, Qt::AlignLeft);
-    tabWidget->addTab(myTab, "Vé của tôi");
+    tabWidget->addTab(myTab, "My Tickets");
 }
 
 void UserWindow::loadData() {
@@ -398,18 +398,18 @@ void UserWindow::onBookTicketClicked() {
     std::string userName = currentUser.getUsername();
     std::string userPhone = currentUser.getPhoneNumber(); 
 
-    if (userName.empty()) { QMessageBox::warning(this, "Đặt vé", "Lỗi: Người dùng chưa đăng nhập"); return; }
+    if (userName.empty()) { QMessageBox::warning(this, "Book ticket", "Error: User not logged in"); return; }
     
     // Use selected trip
     auto items = tripTable->selectedItems();
-    if (items.isEmpty()) { QMessageBox::warning(this, "Đặt vé", "Chọn một chuyến để đặt vé"); return; }
+    if (items.isEmpty()) { QMessageBox::warning(this, "Book ticket", "Select a trip to book"); return; }
     int row = items.first()->row();
     QString tripId = tripTable->item(row,0)->text();
 
     // Find trip and busId, get price
     std::string busId; unsigned long tripPrice = 0;
     for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; } }
-    if (busId.empty()) { QMessageBox::warning(this, "Đặt vé", "Lỗi: Không tìm thấy xe"); return; }
+    if (busId.empty()) { QMessageBox::warning(this, "Book ticket", "Error: Bus not found"); return; }
     int capacity = 40; for (const auto &b : buses){ if (b.getId()==busId) { capacity = b.getCapacity(); break; } }
     for (const auto &r : routes){ for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString() && tr.getRouteId()==r.getId()){ try { tripPrice = std::stol(r.getDistance()) * 1000; } catch(...) { tripPrice = 100000; } break; } } }
     
@@ -419,18 +419,18 @@ void UserWindow::onBookTicketClicked() {
     
     // Create dialog with all inputs
     QDialog dlg(this);
-    dlg.setWindowTitle("Đặt vé chuyến " + tripId);
+    dlg.setWindowTitle("Book tickets trip " + tripId);
     QVBoxLayout *layout = new QVBoxLayout(&dlg);
     
-    layout->addWidget(new QLabel(QString("Ngày khởi hành: %1").arg(dateStr), &dlg));
+    layout->addWidget(new QLabel(QString("Departure date: %1").arg(dateStr), &dlg));
     
     QLineEdit *nameEdit = new QLineEdit(&dlg);
-    nameEdit->setPlaceholderText("Nhập họ và tên hành khách");
+    nameEdit->setPlaceholderText("Enter passenger name");
     nameEdit->setStyleSheet(StyleHelper::getInputStyle());
     layout->addWidget(nameEdit);
 
     QLineEdit *phoneEdit = new QLineEdit(&dlg);
-    phoneEdit->setPlaceholderText("Nhập số điện thoại");
+    phoneEdit->setPlaceholderText("Phone number");
     phoneEdit->setStyleSheet(StyleHelper::getInputStyle());
     phoneEdit->setText(QString::fromStdString(userPhone)); 
     //if (!userPhone.empty()) phoneEdit->setReadOnly(true); (Khong cho phép sửa SĐT)
@@ -450,7 +450,7 @@ void UserWindow::onBookTicketClicked() {
     std::set<int> selectedSeats;
     
         // Price preview label
-    QLabel *pricePreview = new QLabel(QString("Tổng tiền: 0 VND"), &dlg);
+    QLabel *pricePreview = new QLabel(QString("Total: 0 VND"), &dlg);
     pricePreview->setStyleSheet("font-size: 16px; font-weight: bold; color: #22c55e; padding: 10px;");
     pricePreview->setAlignment(Qt::AlignCenter);
     
@@ -469,7 +469,7 @@ void UserWindow::onBookTicketClicked() {
             QObject::connect(btn, &QPushButton::toggled, [&, i, pricePreview, tripPrice](bool checked) {
                 if (checked) { selectedSeats.insert(i); } else { selectedSeats.erase(i); }
                 unsigned long totalPrice = selectedSeats.size() * tripPrice;
-                pricePreview->setText(QString("Tổng tiền: %1 VND").arg(totalPrice));
+                pricePreview->setText(QString("Total: %1 VND").arg(totalPrice));
             });
         }
         int r = (i-1)/cols, c = (i-1)%cols; grid->addWidget(btn, r, c);
@@ -488,9 +488,9 @@ void UserWindow::onBookTicketClicked() {
     QString inputPhone = phoneEdit->text().trimmed();
     QString pay = payment->currentText();
     
-    if (inputName.isEmpty()) { QMessageBox::warning(this,"Đặt vé","Vui lòng nhập họ tên hành khách"); return; }
-    if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Đặt vé","Vui lòng nhập số điện thoại"); return; }
-    if (selectedSeats.empty()){ QMessageBox::warning(this,"Đặt vé","Vui lòng chọn ít nhất một ghế"); return; }
+    if (inputName.isEmpty()) { QMessageBox::warning(this,"Book ticket","Please enter passenger name"); return; }
+    if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Book ticket","Please enter phone number"); return; }
+    if (selectedSeats.empty()){ QMessageBox::warning(this,"Book ticket","Please select at least one seat"); return; }
     
     // Determine file based on trip ID: T005 -> TK005.txt
     std::string fileId = "TK" + tripId.mid(1).toStdString(); 
@@ -523,7 +523,7 @@ void UserWindow::onBookTicketClicked() {
         // Append all selected seats as separate tickets
         {
             std::fstream out(path, std::ios::in | std::ios::out | std::ios::app);
-            if (!out.is_open()) { QMessageBox::critical(this, "Đặt vé", "Không thể lưu vé"); return; }
+            if (!out.is_open()) { QMessageBox::critical(this, "Book ticket", "Cannot save ticket"); return; }
             out.seekg(0, std::ios::end);
             if (out.tellg() > 0) { out.seekg(-1, std::ios::end); char last; out.get(last); if (last != '\n') out << '\n'; }
             
@@ -551,27 +551,27 @@ void UserWindow::onBookTicketClicked() {
             out.close();
         }
         unsigned long totalPrice = selectedSeats.size() * tripPrice;
-        QMessageBox::information(this, "Đặt vé", QString("Đặt %1 vé thành công! Tổng: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
+        QMessageBox::information(this, "Book ticket", QString("Booked %1 tickets successfully! Total: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
     } catch (...) {
-        QMessageBox::critical(this, "Lỗi", "Lỗi không xác định khi lưu vé");
+        QMessageBox::critical(this, "Error", "Undefined error when saving ticket");
     }
 }
 
 void UserWindow::onViewSeatMapClicked() {
     auto items = tripTable->selectedItems();
-    if (items.isEmpty()) { QMessageBox::warning(this, "Sơ đồ ghế", "Chọn một chuyến"); return; }
+    if (items.isEmpty()) { QMessageBox::warning(this, "Seat map", "Select a trip"); return; }
     int row = items.first()->row();
     QString tripId = tripTable->item(row,0)->text();
     std::string busId; for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; } }
-    if (busId.empty()) { QMessageBox::warning(this, "Sơ đồ ghế", "Không tìm thấy xe"); return; }
+    if (busId.empty()) { QMessageBox::warning(this, "Seat map", "Bus not found"); return; }
     QString dateStr = calendar->selectedDate().toString("yyyy-MM-dd");
     std::set<int> booked;
     for (const auto &t: tickets){ if (t.getBusId()==busId){ std::string bAt = t.getBookedAt(); if (bAt.rfind(dateStr.toStdString(),0)==0){ booked.insert(t.getSeatNo()); } } }
     
     // Show visual seat map
-    QDialog dlg(this); dlg.setWindowTitle("Sơ đồ ghế"); dlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
+    QDialog dlg(this); dlg.setWindowTitle("Seat map"); dlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
     QVBoxLayout *lay = new QVBoxLayout(&dlg);
-    lay->addWidget(new QLabel(QString("Ngày %1 - Xe %2").arg(dateStr).arg(QString::fromStdString(busId))));
+    lay->addWidget(new QLabel(QString("Date %1 - Bus %2").arg(dateStr).arg(QString::fromStdString(busId))));
     
     QWidget *seatWidget = new QWidget(); QGridLayout *gl = new QGridLayout(seatWidget);
     int busCapacity = 0; for (const auto &b: buses){ if (b.getId()==busId) { busCapacity=b.getCapacity(); break; } }
@@ -593,18 +593,18 @@ void UserWindow::onViewSeatMapClicked() {
 
 void UserWindow::onCancelMyTicketClicked() {
     auto items = myTicketsTable->selectedItems();
-    if (items.isEmpty()){ QMessageBox::warning(this,"Hủy vé","Chọn một vé để hủy"); return; }
+    if (items.isEmpty()){ QMessageBox::warning(this,"Cancel ticket","Select a ticket to cancel"); return; }
     int row = items.first()->row();
     QString id = myTicketsTable->item(row,0)->text();
     std::string idStr = id.toStdString();
 
     // Find ticket in memory to know its trip (and file)
     auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket &t){ return t.getId() == idStr; });
-    if (it == tickets.end()) { QMessageBox::warning(this,"Hủy vé","Không tìm thấy vé"); return; }
+    if (it == tickets.end()) { QMessageBox::warning(this,"Cancel ticket","Ticket not found"); return; }
 
     std::string tripIdStr = it->getTripId();
     if (tripIdStr.empty() || tripIdStr.size() < 2 || tripIdStr[0] != 'T') {
-        QMessageBox::warning(this,"Hủy vé","Không xác định được file vé");
+        QMessageBox::warning(this,"Cancel ticket","Cannot determine ticket file");
         return;
     }
 
@@ -635,7 +635,7 @@ void UserWindow::onCancelMyTicketClicked() {
     // Update memory: remove the cancelled ticket globally
     tickets.erase(std::remove_if(tickets.begin(), tickets.end(), [&](const Ticket&t){ return t.getId()==idStr; }), tickets.end());
     populateMyTickets();
-    QMessageBox::information(this, "Hủy vé", "Đã hủy vé");
+    QMessageBox::information(this, "Cancel ticket", "Ticket cancelled successfully");
 }
 
 void UserWindow::onLogoutClicked() {

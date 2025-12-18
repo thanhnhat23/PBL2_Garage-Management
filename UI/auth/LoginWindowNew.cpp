@@ -221,8 +221,8 @@ void LoginWindowNew::loadUsers() {
     }
 
     if (users.empty()) {
-        users.push_back(User("U001", "admin", "admin123", Role::ADMIN));
-        users.push_back(User("U002", "user1", "123456", Role::USER));
+        users.push_back(User("U001", "admin", "admin123", Role::ADMIN, "111"));
+        users.push_back(User("U002", "user1", "123456", Role::USER, "000"));
         saveUsers();
     }
 }
