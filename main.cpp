@@ -73,6 +73,7 @@ static vector<T> loadData(const string &file, T (*loader)(const string&)) {
     while (getline(f, line)) if (!line.empty()) out.push_back(loader(line));
     return out;
 }
+
 static string nowStr() {
     auto now = chrono::system_clock::now();
     time_t t = chrono::system_clock::to_time_t(now);
@@ -83,11 +84,16 @@ static string nowStr() {
     ltm = *localtime(&t);
 #endif
     stringstream ss;
-    ss << (1900+ltm.tm_year) << "-" << setfill('0') << setw(2) << (1+ltm.tm_mon)
-       << "-" << setw(2) << ltm.tm_mday << " " << setw(2) << ltm.tm_hour
-       << ":" << setw(2) << ltm.tm_min;
+    
+    ss << (1900 + ltm.tm_year) << "-" 
+       << setfill('0') << setw(2) << (1 + ltm.tm_mon) << "-" 
+       << setfill('0') << setw(2) << ltm.tm_mday << " " 
+       << setfill('0') << setw(2) << ltm.tm_hour << ":" 
+       << setfill('0') << setw(2) << ltm.tm_min;
+       
     return ss.str();
 }
+
 static void flushConsoleEvents() {
 #ifdef _WIN32
     FlushConsoleInputBuffer(GetStdHandle(STD_INPUT_HANDLE));
@@ -1494,7 +1500,15 @@ static void menuBooking(AuthManager& auth,
                 bookedSeats.push_back(tk.getSeatNo());
             }
         }
-
+        bookedSeats.clear();
+        for (const auto& tk : tickets) {
+        bool matchTrip = (tk.getTripId() == selectedTrip->getId());
+        string ticketDate = tk.getBookedAt().substr(0, 10); 
+        bool matchDate = (ticketDate == travelDate);
+        if (matchTrip && matchDate) {
+            bookedSeats.push_back(tk.getSeatNo());
+            }
+        }
         // Chooose Seat
         cout << "\n--- 4. SELECT SEAT (Bus: " << currentBus->getName() << ") ---\n";
         int capacity = currentBus->getCapacity();
@@ -1588,8 +1602,9 @@ static void menuBooking(AuthManager& auth,
             if (!u) return;
             cout << "   [ YOUR TICKETS ]\n";
             int c = 0;
+            string myPhone = u->getPhoneNumber();
             for(const auto& t : tickets) {
-                if(t.getPhoneNumber() == u->getPhoneNumber() && !isDateInPast(t.getBookedAt().substr(0,10))) {
+                if(!myPhone.empty() && t.getPhoneNumber() == myPhone && !isDateInPast(t.getBookedAt().substr(0,10))) {
                     cout << t.getId() << " | Trip: " << t.getTripId() << " | Date: " << t.getBookedAt().substr(0,10) << "\n";
                     c++;
                 }
