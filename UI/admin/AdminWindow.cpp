@@ -770,10 +770,18 @@ void AdminWindow::setupTicketsTab() {
     btnRefresh->setStyleSheet(StyleHelper::getSecondaryButtonStyle());
     btnRefresh->setCursor(Qt::PointingHandCursor);
     connect(btnRefresh, &QPushButton::clicked, this, &AdminWindow::onRefreshClicked);
+
+    QPushButton *btnExport = new QPushButton("Export CSV", ticketTab);
+    btnExport->setIcon(renderSvgIcon(":/icons/icons/export.svg", QSize(16,16), "#22c55e"));
+    btnExport->setIconSize(QSize(16,16));
+    btnExport->setStyleSheet(StyleHelper::getSuccessButtonStyle());
+    btnExport->setCursor(Qt::PointingHandCursor);
+    connect(btnExport, &QPushButton::clicked, this, &AdminWindow::onExportTicketsCsv);
     
     btnLayout->addWidget(btnBook);
     btnLayout->addWidget(btnCancel);
     btnLayout->addWidget(btnRefresh);
+    btnLayout->addWidget(btnExport);
     
     // Master-Detail: left ticket file summary, right tickets for selected file
     QSplitter *split = new QSplitter(Qt::Horizontal, ticketTab);
@@ -1640,16 +1648,19 @@ void AdminWindow::onFilterByDay() {
     QDialog dialog(this);
     dialog.setWindowTitle("Filter by Day");
     dialog.setStyleSheet("background: #0f172a; color: #e5e7eb;");
-    dialog.setMinimumWidth(300);
+    dialog.setMinimumWidth(360);
     
     QVBoxLayout *layout = new QVBoxLayout(&dialog);
     QLabel *label = new QLabel("Select Day:", &dialog);
     label->setStyleSheet("font-size: 14px; color: #e5e7eb;");
-    
-    QDateEdit *dateEdit = new QDateEdit(&dialog);
-    dateEdit->setCalendarPopup(true);
-    dateEdit->setDate(QDate::currentDate());
-    dateEdit->setStyleSheet("QDateEdit { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; padding: 8px; border-radius: 6px; } QDateEdit::drop-down { border: none; }");
+
+    QCalendarWidget *calendar = new QCalendarWidget(&dialog);
+    calendar->setSelectedDate(QDate::currentDate());
+    calendar->setGridVisible(true);
+    calendar->setStyleSheet(
+        "QCalendarWidget { background: #0f172a; color: #e5e7eb; }"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar { background: #1f2937; }"
+    );
     
     QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     btnBox->setStyleSheet("QPushButton { background: #2563eb; color: white; padding: 8px 16px; border-radius: 6px; } QPushButton:hover { background: #1d4ed8; }");
@@ -1657,12 +1668,12 @@ void AdminWindow::onFilterByDay() {
     connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     
     layout->addWidget(label);
-    layout->addWidget(dateEdit);
+    layout->addWidget(calendar);
     layout->addWidget(btnBox);
     
     if (dialog.exec() != QDialog::Accepted) return;
     
-    QString dateStr = dateEdit->date().toString("yyyy-MM-dd");
+    QString dateStr = calendar->selectedDate().toString("yyyy-MM-dd");
     
     std::vector<Ticket> filtered;
     for (const auto& tk : tickets) {
@@ -1744,14 +1755,28 @@ void AdminWindow::onFilterByYear() {
     dialog.setMinimumWidth(300);
     
     QVBoxLayout *layout = new QVBoxLayout(&dialog);
+
+    // Collect available years from tickets
+    std::set<QString> years;
+    for (const auto &tk : tickets) {
+        const std::string &ba = tk.getBookedAt();
+        if (ba.size() >= 4) years.insert(QString::fromStdString(ba.substr(0,4)));
+    }
+    if (years.empty()) {
+        QMessageBox::information(this, "Filter by Year", "No tickets available to determine years.");
+        return;
+    }
+    QList<QString> yearList = QList<QString>(years.begin(), years.end());
+    std::sort(yearList.begin(), yearList.end());
     
     QLabel *label = new QLabel("Select Year:", &dialog);
     label->setStyleSheet("font-size: 14px; color: #e5e7eb;");
     
-    QSpinBox *spinYear = new QSpinBox(&dialog);
-    spinYear->setStyleSheet("QSpinBox { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; padding: 8px; border-radius: 6px; }");
-    spinYear->setRange(2020, 2030);
-    spinYear->setValue(QDate::currentDate().year());
+    QComboBox *cmbYear = new QComboBox(&dialog);
+    cmbYear->setStyleSheet("QComboBox { background: #1e293b; color: #e5e7eb; border: 1px solid #334155; padding: 8px; border-radius: 6px; }");
+    for (const auto &y : yearList) cmbYear->addItem(y);
+    int idx = cmbYear->findText(QString::number(QDate::currentDate().year()));
+    if (idx >= 0) cmbYear->setCurrentIndex(idx);
     
     QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     btnBox->setStyleSheet("QPushButton { background: #2563eb; color: white; padding: 8px 16px; border-radius: 6px; } QPushButton:hover { background: #1d4ed8; }");
@@ -1759,12 +1784,12 @@ void AdminWindow::onFilterByYear() {
     connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     
     layout->addWidget(label);
-    layout->addWidget(spinYear);
+    layout->addWidget(cmbYear);
     layout->addWidget(btnBox);
     
     if (dialog.exec() != QDialog::Accepted) return;
     
-    QString yearStr = QString::number(spinYear->value());
+    QString yearStr = cmbYear->currentText();
     
     std::vector<Ticket> filtered;
     for (const auto& tk : tickets) {
@@ -2775,4 +2800,54 @@ void AdminWindow::onCancelTicketClicked() {
         loadAllData();
         populateTicketsTable();
     }
+}
+
+void AdminWindow::onExportTicketsCsv() {
+    QTableWidget *table = findChild<QTableWidget*>("ticketDetailTable");
+    if (!table) {
+        QMessageBox::warning(this, "Export CSV", "Ticket table not found.");
+        return;
+    }
+
+    // Ensure export directory exists
+    QDir().mkpath("export");
+
+    // Determine file name by selected file or search state
+    QString scope = ticketSearch.trimmed().isEmpty() && !selectedTicketFile.empty()
+                    ? QString::fromStdString(selectedTicketFile)
+                    : QString("all");
+    QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString outPath = QString("export/admin_tickets_%1_%2.csv").arg(scope, ts);
+
+    QFile f(outPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Export CSV", "Cannot write export file.");
+        return;
+    }
+    QTextStream out(&f);
+    out.setEncoding(QStringConverter::Utf8);
+
+    // Write header
+    QStringList headers;
+    for (int c = 0; c < table->columnCount(); ++c) {
+        headers << table->horizontalHeaderItem(c)->text();
+    }
+    out << headers.join(',') << "\n";
+
+    // Write rows
+    for (int r = 0; r < table->rowCount(); ++r) {
+        QStringList cols;
+        for (int c = 0; c < table->columnCount(); ++c) {
+            QTableWidgetItem *it = table->item(r, c);
+            QString val = it ? it->text() : QString();
+            // Quote if contains comma or quote
+            if (val.contains('"')) val.replace('"', """");
+            if (val.contains(',') || val.contains('"')) val = '"' + val + '"';
+            cols << val;
+        }
+        out << cols.join(',') << "\n";
+    }
+
+    f.close();
+    QMessageBox::information(this, "Export CSV", QString("Exported %1 rows to %2").arg(table->rowCount()).arg(outPath));
 }

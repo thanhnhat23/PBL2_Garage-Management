@@ -329,7 +329,19 @@ void UserWindow::setupTabs() {
     btnCancel->setStyleSheet(StyleHelper::getDangerButtonStyle());
     btnCancel->setCursor(Qt::PointingHandCursor);
     connect(btnCancel, &QPushButton::clicked, this, &UserWindow::onCancelMyTicketClicked);
-    mLayout->addWidget(btnCancel, 0, Qt::AlignLeft);
+
+    QPushButton *btnExport = new QPushButton("Export CSV", myTab);
+    btnExport->setIcon(renderSvgIcon(":/icons/icons/export.svg", QSize(16,16), "#22c55e"));
+    btnExport->setIconSize(QSize(16,16));
+    btnExport->setStyleSheet(StyleHelper::getSuccessButtonStyle());
+    btnExport->setCursor(Qt::PointingHandCursor);
+    connect(btnExport, &QPushButton::clicked, this, &UserWindow::onExportMyTicketsCsv);
+
+    QHBoxLayout *btLayout = new QHBoxLayout();
+    btLayout->addWidget(btnCancel);
+    btLayout->addWidget(btnExport);
+    btLayout->addStretch();
+    mLayout->addLayout(btLayout);
     tabWidget->addTab(myTab, "My Tickets");
 }
 
@@ -373,6 +385,11 @@ void UserWindow::populateMyTickets() {
     
     if (userName.empty()) return;
     
+    // Build quick lookups
+    std::map<std::string, Trip> tripMap; for (const auto &tr : trips) tripMap[tr.getId()] = tr;
+    std::map<std::string, Route> routeMap; for (const auto &rt : routes) routeMap[rt.getId()] = rt;
+    auto formatVnd = [](unsigned long amount){ QString s = QString::number(amount); for (int i=s.length()-3;i>0;i-=3) s.insert(i, '.'); return s + "vnd"; };
+
     for (size_t idx = 0; idx < tickets.size(); idx++){ 
         const auto &tk = tickets[idx];
         
@@ -383,11 +400,20 @@ void UserWindow::populateMyTickets() {
             int row = myTicketsTable->rowCount(); 
             myTicketsTable->insertRow(row);
             myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-            myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+            // Trip: show Start - End
+            QString tripDisplay = QString::fromStdString(tk.getTripId());
+            auto itTr = tripMap.find(tk.getTripId());
+            if (itTr != tripMap.end()) {
+                auto itRt = routeMap.find(itTr->second.getRouteId());
+                if (itRt != routeMap.end()) {
+                    tripDisplay = QString::fromStdString(itRt->second.getStart() + " - " + itRt->second.getEnd());
+                }
+            }
+            myTicketsTable->setItem(row,1,new QTableWidgetItem(tripDisplay));
             myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
             myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
             myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-            myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+            myTicketsTable->setItem(row,5,new QTableWidgetItem(formatVnd(tk.getPrice())));
             myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
         }
     }
@@ -541,11 +567,29 @@ void UserWindow::onBookTicketClicked() {
                 int row = myTicketsTable->rowCount();
                 myTicketsTable->insertRow(row);
                 myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-                myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+                // Format Trip as Start - End
+                QString tripDisplay = QString::fromStdString(tk.getTripId());
+                for (const auto &tr : trips) {
+                    if (tr.getId() == tk.getTripId()) {
+                        for (const auto &rt : routes) {
+                            if (rt.getId() == tr.getRouteId()) {
+                                tripDisplay = QString::fromStdString(rt.getStart() + " - " + rt.getEnd());
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                myTicketsTable->setItem(row,1,new QTableWidgetItem(tripDisplay));
                 myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
                 myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
                 myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-                myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+                {
+                    QString s = QString::number(tk.getPrice());
+                    for (int i=s.length()-3;i>0;i-=3) s.insert(i, '.');
+                    s += "vnd";
+                    myTicketsTable->setItem(row,5,new QTableWidgetItem(s));
+                }
                 myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
             }
             out.close();
@@ -640,6 +684,43 @@ void UserWindow::onCancelMyTicketClicked() {
 
 void UserWindow::onLogoutClicked() {
     emit logout();
+}
+
+void UserWindow::onExportMyTicketsCsv() {
+    if (!myTicketsTable) return;
+    QDir().mkpath("export");
+    QString user = QString::fromStdString(currentUser.getUsername());
+    if (user.isEmpty()) user = "guest";
+    QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString path = QString("export/user_tickets_%1_%2.csv").arg(user, ts);
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Export CSV", "Cannot write export file.");
+        return;
+    }
+    QTextStream out(&f);
+    out.setEncoding(QStringConverter::Utf8);
+
+    // Header
+    QStringList headers;
+    for (int c=0;c<myTicketsTable->columnCount();++c) headers << myTicketsTable->horizontalHeaderItem(c)->text();
+    out << headers.join(',') << "\n";
+
+    // Rows
+    for (int r=0;r<myTicketsTable->rowCount();++r){
+        QStringList cols;
+        for (int c=0;c<myTicketsTable->columnCount();++c){
+            QTableWidgetItem *it = myTicketsTable->item(r,c);
+            QString val = it ? it->text() : QString();
+            if (val.contains('"')) val.replace('"', """");
+            if (val.contains(',') || val.contains('"')) val = '"' + val + '"';
+            cols << val;
+        }
+        out << cols.join(',') << "\n";
+    }
+    f.close();
+    QMessageBox::information(this, "Export CSV", QString("Exported %1 rows to %2").arg(myTicketsTable->rowCount()).arg(path));
 }
 
 void UserWindow::refreshData() {

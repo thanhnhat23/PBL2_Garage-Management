@@ -16,6 +16,8 @@
 #include "../Class/Trip.h"
 #include "../Class/Ticket.h"
 #include <vector>
+#include <QDir>
+#include <QDateTime>
 
 class UserWindow : public QWidget {
     Q_OBJECT
@@ -36,6 +38,7 @@ private slots:
     void onBookTicketClicked();
     void onViewSeatMapClicked();
     void onCancelMyTicketClicked();
+    void onExportMyTicketsCsv();
     void onLogoutClicked();
     void refreshData();
 
