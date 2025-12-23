@@ -17,6 +17,8 @@
 #include "../Class/Seat.h"
 #include <vector>
 #include <map>
+#include <QDir>
+#include <QDateTime>
 
 class AdminWindow : public QWidget {
     Q_OBJECT
@@ -33,6 +35,7 @@ private slots:
     void onLogoutClicked();
     void loadAllData();
     void onRefreshClicked();
+    void onExportTicketsCsv();
     
     // Brand CRUD
     void onAddBrandClicked();

@@ -33,6 +33,7 @@ private slots:
     void onBookTicketClicked();
     void onViewSeatMapClicked();
     void onCancelMyTicketClicked();
+    void onExportMyTicketsCsv();
     void onLogoutClicked();
     void refreshData();
 

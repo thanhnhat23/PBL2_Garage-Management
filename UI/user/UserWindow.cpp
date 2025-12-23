@@ -216,7 +216,19 @@ void UserWindow::setupTabs() {
     btnCancel->setIcon(renderSvgIcon(":/icons/icons/ticket-cancel.svg", QSize(16,16), "#ef4444"));
     btnCancel->setStyleSheet(StyleHelper::getDangerButtonStyle());
     connect(btnCancel, &QPushButton::clicked, this, &UserWindow::onCancelMyTicketClicked);
-    mLayout->addWidget(btnCancel, 0, Qt::AlignLeft);
+
+    QPushButton *btnExport = new QPushButton("Export CSV", myTab);
+    btnExport->setIcon(renderSvgIcon(":/icons/icons/export.svg", QSize(16,16), "#22c55e"));
+    btnExport->setIconSize(QSize(16,16));
+    btnExport->setStyleSheet(StyleHelper::getSuccessButtonStyle());
+    btnExport->setCursor(Qt::PointingHandCursor);
+    connect(btnExport, &QPushButton::clicked, this, &UserWindow::onExportMyTicketsCsv);
+
+    QHBoxLayout *btLayout = new QHBoxLayout();
+    btLayout->addWidget(btnCancel);
+    btLayout->addWidget(btnExport);
+    btLayout->addStretch();
+    mLayout->addLayout(btLayout);
     tabWidget->addTab(myTab, "My Tickets");
 }
 
@@ -283,6 +295,11 @@ void UserWindow::populateMyTickets() {
     std::string userPhone = currentUser.getPhoneNumber();
     if (userName.empty()) return;
     
+    // Build quick lookups
+    std::map<std::string, Trip> tripMap; for (const auto &tr : trips) tripMap[tr.getId()] = tr;
+    std::map<std::string, Route> routeMap; for (const auto &rt : routes) routeMap[rt.getId()] = rt;
+    auto formatVnd = [](unsigned long amount){ QString s = QString::number(amount); for (int i=s.length()-3;i>0;i-=3) s.insert(i, '.'); return s + "vnd"; };
+
     for (size_t idx = 0; idx < tickets.size(); idx++){ 
         const auto &tk = tickets[idx];
         bool matchName = (tk.getPassengerName() == userName);
@@ -292,11 +309,20 @@ void UserWindow::populateMyTickets() {
             int row = myTicketsTable->rowCount(); 
             myTicketsTable->insertRow(row);
             myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-            myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+            // Trip: show Start - End
+            QString tripDisplay = QString::fromStdString(tk.getTripId());
+            auto itTr = tripMap.find(tk.getTripId());
+            if (itTr != tripMap.end()) {
+                auto itRt = routeMap.find(itTr->second.getRouteId());
+                if (itRt != routeMap.end()) {
+                    tripDisplay = QString::fromStdString(itRt->second.getStart() + " - " + itRt->second.getEnd());
+                }
+            }
+            myTicketsTable->setItem(row,1,new QTableWidgetItem(tripDisplay));
             myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
             myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
             myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-            myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+            myTicketsTable->setItem(row,5,new QTableWidgetItem(formatVnd(tk.getPrice())));
             myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
         }
     }
@@ -420,23 +446,44 @@ void UserWindow::onBookTicketClicked() {
     std::ofstream out(ticketPath, std::ios::app);
     std::string bookedAtStr = (dateStr + " 00:00").toStdString();
     
-    for (int seatNo : selectedSeats) {
-        maxTkNum++;
-        std::string newId = "TK" + std::string(3 - std::to_string(maxTkNum).length(), '0') + std::to_string(maxTkNum);
-        
-        auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-        char timebuf[20]; std::strftime(timebuf, sizeof(timebuf), "%H:%M:%S", std::localtime(&time));
-        std::string bookedAt = dateStr.toStdString() + " " + timebuf;
-        
-        Ticket tk(newId, tripId.toStdString(), busId, seatNo, inputName.toStdString(), inputPhone.toStdString(), tripPrice, bookedAt, pay.toStdString());
-        out << tk.toCSV() << "\n";
-        tickets.push_back(tk);
+    try {
+        std::string path = std::string("Data/Ticket/") + fileId + ".txt";
+
+        // Append all selected seats as separate tickets
+        {
+            std::fstream out(path, std::ios::in | std::ios::out | std::ios::app);
+            if (!out.is_open()) { QMessageBox::critical(this, "Book ticket", "Cannot save ticket"); return; }
+            out.seekg(0, std::ios::end);
+            if (out.tellg() > 0) { out.seekg(-1, std::ios::end); char last; out.get(last); if (last != '\n') out << '\n'; }
+            
+            // Create and save tickets for each selected seat
+            for (int seatNo : selectedSeats) {
+                maxTkNum++;
+                std::string newId = "TK" + std::string(3 - std::to_string(maxTkNum).length(), '0') + std::to_string(maxTkNum);
+                Ticket tk(newId, tripId.toStdString(), busId, seatNo, nameStr, phoneStr, tripPrice, bookedAtStr, payStr);
+                out << tk.toCSV() << "\n";
+
+                // Add to memory
+                tickets.push_back(tk);
+                
+                // Add row to table
+                int row = myTicketsTable->rowCount();
+                myTicketsTable->insertRow(row);
+                myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
+                myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+                myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
+                myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
+                myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
+                myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+                myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
+            }
+            out.close();
+        }
+        unsigned long totalPrice = selectedSeats.size() * tripPrice;
+        QMessageBox::information(this, "Book ticket", QString("Booked %1 tickets successfully! Total: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
+    } catch (...) {
+        QMessageBox::critical(this, "Error", "Undefined error when saving ticket");
     }
-    out.close();
-    
-    QMessageBox::information(this, "Success", "Booked successfully!");
-    populateMyTickets();
 }
 
 void UserWindow::onViewSeatMapClicked() {
@@ -516,6 +563,43 @@ void UserWindow::onCancelMyTicketClicked() {
 
 void UserWindow::onLogoutClicked() {
     emit logout();
+}
+
+void UserWindow::onExportMyTicketsCsv() {
+    if (!myTicketsTable) return;
+    QDir().mkpath("export");
+    QString user = QString::fromStdString(currentUser.getUsername());
+    if (user.isEmpty()) user = "guest";
+    QString ts = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    QString path = QString("export/user_tickets_%1_%2.csv").arg(user, ts);
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Export CSV", "Cannot write export file.");
+        return;
+    }
+    QTextStream out(&f);
+    out.setEncoding(QStringConverter::Utf8);
+
+    // Header
+    QStringList headers;
+    for (int c=0;c<myTicketsTable->columnCount();++c) headers << myTicketsTable->horizontalHeaderItem(c)->text();
+    out << headers.join(',') << "\n";
+
+    // Rows
+    for (int r=0;r<myTicketsTable->rowCount();++r){
+        QStringList cols;
+        for (int c=0;c<myTicketsTable->columnCount();++c){
+            QTableWidgetItem *it = myTicketsTable->item(r,c);
+            QString val = it ? it->text() : QString();
+            if (val.contains('"')) val.replace('"', """");
+            if (val.contains(',') || val.contains('"')) val = '"' + val + '"';
+            cols << val;
+        }
+        out << cols.join(',') << "\n";
+    }
+    f.close();
+    QMessageBox::information(this, "Export CSV", QString("Exported %1 rows to %2").arg(myTicketsTable->rowCount()).arg(path));
 }
 
 void UserWindow::refreshData() {
