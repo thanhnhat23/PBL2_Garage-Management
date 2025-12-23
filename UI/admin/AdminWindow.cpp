@@ -1,4 +1,5 @@
 #include "AdminWindow.h"
+#include "../Class/FareCalculator.h"
 #include "StyleHelper.h"
 #include "CRUDDialogs.h"
 #include <QVBoxLayout>
@@ -1064,8 +1065,8 @@ void AdminWindow::loadTicketsData() {
     ticketsByFile.clear();
     ticketFileOrder.clear();
     std::string line;
-    for (int i = 1; i <= 100; i++) {
-        std::string fileId = "TK" + std::string(3 - std::to_string(i).length(), '0') + std::to_string(i);
+    for (const auto& trip : trips) {
+        std::string fileId = trip.getId();
         std::string filename = "Data/Ticket/" + fileId + ".txt";
         if (!fs::exists(filename)) continue;
 
@@ -1831,13 +1832,17 @@ void AdminWindow::onAddRouteClicked() {
     RouteDialog dlg(this);
     if (dlg.exec() == QDialog::Accepted) {
         Route input = dlg.getRoute();
-        // Generate ID
+        
+        if (input.getName().empty() || input.getDistance().empty() || input.getDuration().empty()) {
+            QMessageBox::warning(this, "Input Error", "Please enter all route information (Name, Distance, Duration)!");
+            return;
+        }
+
         std::string lastId = routes.empty() ? "R000" : routes.back().getId();
         int next = 0; try { next = std::stoi(lastId.substr(1)) + 1; } catch(...) {}
         std::stringstream ss; ss << "R" << std::setw(3) << std::setfill('0') << next;
         std::string newId = ss.str();
 
-        // Parse start/end from name if needed
         std::string start = input.getStart();
         std::string end = input.getEnd();
         if (!input.getName().empty()) {
@@ -1851,7 +1856,13 @@ void AdminWindow::onAddRouteClicked() {
         Route r(newId, input.getName(), start, end, input.getDistance(), input.getDuration());
         routes.push_back(r);
         Ultil<Route>::saveToFile("Data/Route.txt", routes);
+        
+        routeSearch = ""; 
+        QLineEdit *txtSearch = findChild<QLineEdit*>(); 
+        if(txtSearch) txtSearch->clear();
+        
         populateRoutesTable();
+        QMessageBox::information(this, "Success", "Route added successfully!");
     }
 }
 
@@ -2426,111 +2437,80 @@ void AdminWindow::onFilterTicketsByBus() {
     }
 }
 
-
-
 void AdminWindow::onBookTicketClicked() {
-    // Create booking dialog
     QDialog dialog(this);
-    dialog.setWindowTitle("Đặt vé");
+    dialog.setWindowTitle("Book Ticket (Admin)");
     dialog.setStyleSheet("background: #0f172a; color: #e5e7eb;");
-    dialog.setMinimumWidth(500);
+    dialog.setMinimumWidth(550);
     
     QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
     QFormLayout *formLayout = new QFormLayout();
     
-    // Trip selection
-    QComboBox *cbTrip = new QComboBox(&dialog);
-    for (const auto& trip : trips) {
-        QString display;
-        for (const auto& route : routes) {
-            if (route.getId() == trip.getRouteId()) {
-                display = QString::fromStdString(
-                    trip.getId() + ": " + route.getStart() + " - " + route.getEnd() + 
-                    " (" + trip.getDepart() + ")"
-                );
-                break;
-            }
-        }
-        cbTrip->addItem(display, QString::fromStdString(trip.getId()));
+    QComboBox *cbRoute = new QComboBox(&dialog);
+    cbRoute->addItem("-- Select Route --", ""); 
+    for (const auto& r : routes) {
+        cbRoute->addItem(QString::fromStdString(r.getName()), QString::fromStdString(r.getId()));
     }
 
-    // Date selection for the trip (calendar style)
+    QComboBox *cbTrip = new QComboBox(&dialog);
+    
     QCalendarWidget *calTrip = new QCalendarWidget(&dialog);
     calTrip->setGridVisible(true);
+    
+    calTrip->setMinimumDate(QDate::currentDate()); 
+
     calTrip->setSelectedDate(QDate::currentDate());
     calTrip->setStyleSheet(
-        "QCalendarWidget {"
-        "  background: #0f172a;"
-        "  color: #e2e8f0;"
-        "  border: 1px solid #1f2937;"
-        "  border-radius: 12px;"
-        "  selection-background-color: #2563eb;"
-        "  selection-color: #f8fafc;"
-        "}"
-        "QCalendarWidget QWidget#qt_calendar_navigationbar {"
-        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f2937, stop:1 #0f172a);"
-        "  min-height: 46px;"
-        "  border-bottom: 1px solid #1f2937;"
-        "}"
-        "QCalendarWidget QToolButton {"
-        "  color: #e5e7eb;"
-        "  background: transparent;"
-        "  border: none;"
-        "  padding: 6px 12px;"
-        "  font-weight: 600;"
-        "  min-width: 20px;"
-        "}"
+        "QCalendarWidget { background: #0f172a; color: #e2e8f0; border: 1px solid #1f2937; border-radius: 12px; selection-background-color: #2563eb; selection-color: #f8fafc; }"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f2937, stop:1 #0f172a); min-height: 46px; border-bottom: 1px solid #1f2937; }"
+        "QCalendarWidget QToolButton { color: #e5e7eb; background: transparent; border: none; padding: 6px 12px; font-weight: 600; min-width: 20px; }"
         "QCalendarWidget QToolButton:hover { color: #3b82f6; }"
-        "QCalendarWidget QAbstractItemView {"
-        "  background: #0b1220;"
-        "  alternate-background-color: #111827;"
-        "  selection-background-color: #2563eb;"
-        "  selection-color: #f8fafc;"
-        "  outline: 0;"
-        "  font-weight: 600;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item {"
-        "  padding: 6px;"
-        "  margin: 2px;"
-        "  border-radius: 8px;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item:selected {"
-        "  background: #2563eb;"
-        "  color: #f8fafc;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item:hover {"
-        "  background: rgba(59,130,246,0.18);"
-        "}"
-        "QCalendarWidget QSpinBox {"
-        "  background: #111827;"
-        "  color: #e5e7eb;"
-        "  border: 1px solid #1f2937;"
-        "  border-radius: 6px;"
-        "  padding: 2px 6px;"
-        "}"
+        "QCalendarWidget QAbstractItemView { background: #0b1220; alternate-background-color: #111827; selection-background-color: #2563eb; selection-color: #f8fafc; outline: 0; font-weight: 600; }"
+        "QCalendarWidget QAbstractItemView::item { padding: 6px; margin: 2px; border-radius: 8px; }"
+        "QCalendarWidget QAbstractItemView::item:selected { background: #2563eb; color: #f8fafc; }"
+        "QCalendarWidget QAbstractItemView::item:hover { background: rgba(59,130,246,0.18); }"
+        "QCalendarWidget QSpinBox { background: #111827; color: #e5e7eb; border: 1px solid #1f2937; border-radius: 6px; padding: 2px 6px; }"
+        "QCalendarWidget QWidget { alternate-background-color: #0f172a; }" 
     );
-    
-    // Seat selection based on date + bus
+
+    auto updateTrips = [&]() {
+        cbTrip->clear();
+        QString selectedRouteId = cbRoute->currentData().toString();
+        if (selectedRouteId.isEmpty()) return;
+
+        for (const auto& trip : trips) {
+            if (trip.getRouteId() == selectedRouteId.toStdString()) {
+                cbTrip->addItem(QString::fromStdString(trip.getId() + " (" + trip.getDepart() + ")"), 
+                                QString::fromStdString(trip.getId()));
+            }
+        }
+    };
+    connect(cbRoute, QOverload<int>::of(&QComboBox::currentIndexChanged), updateTrips);
+
     QComboBox *cbSeat = new QComboBox(&dialog);
-    auto updateSeats = [&]() {
+    QLineEdit *txtName = new QLineEdit(&dialog); txtName->setPlaceholderText("Passenger Name");
+    QLineEdit *txtPhone = new QLineEdit(&dialog); txtPhone->setPlaceholderText("Phone Number");
+    QComboBox *cbPayment = new QComboBox(&dialog); cbPayment->addItems({"Cash", "Momo", "ZaloPay", "Bank Transfer"});
+    QLabel *lblPrice = new QLabel("Price: 0 VND", &dialog); lblPrice->setStyleSheet("font-weight: bold; color: #FDB515;");
+
+    auto updateSeatsAndPrice = [&]() {
         cbSeat->clear();
+        lblPrice->setText("Price: 0 VND");
+        if (cbTrip->count() == 0) return;
+
         QString tripId = cbTrip->currentData().toString();
         QString dateStr = calTrip->selectedDate().toString("yyyy-MM-dd");
+        
         std::string busId;
         int capacity = 0;
         for (const auto& trip : trips) {
-            if (trip.getId() == tripId.toStdString()) {
-                busId = trip.getBusId();
-                break;
-            }
+            if (trip.getId() == tripId.toStdString()) { busId = trip.getBusId(); break; }
         }
         for (const auto& bus : buses) {
             if (bus.getId() == busId) { capacity = bus.getCapacity(); break; }
         }
-        if (capacity == 0) {
-            cbSeat->addItem("Out of seats", -1);
-            return;
-        }
+
+        if (capacity == 0) { cbSeat->addItem("No Bus Found", -1); return; }
 
         std::set<int> booked;
         for (const auto& tk : tickets) {
@@ -2547,111 +2527,74 @@ void AdminWindow::onBookTicketClicked() {
                 anySeat = true;
             }
         }
-        if (!anySeat) cbSeat->addItem("Out of seats", -1);
-    };
-    connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updateSeats);
-    connect(calTrip, &QCalendarWidget::selectionChanged, this, [&, updateSeats](){ updateSeats(); });
-    updateSeats();
-    
-    // Passenger info
-    QLineEdit *txtName = new QLineEdit(&dialog);
-    txtName->setPlaceholderText("Passenger name");
-    QLineEdit *txtPhone = new QLineEdit(&dialog);
-    txtPhone->setPlaceholderText("Phone number");
+        if (!anySeat) cbSeat->addItem("Sold Out", -1);
 
-    // Payment method
-    QComboBox *cbPayment = new QComboBox(&dialog);
-    cbPayment->addItems({"Cash", "Momo", "ZaloPay", "Chuyển khoản"});
-    
-    // Price calculation label
-    QLabel *lblPrice = new QLabel("Price: 0 VND", &dialog);
-    lblPrice->setStyleSheet("font-weight: bold; color: #FDB515;");
-    
-    // Auto-calculate price when trip changes
-    auto updatePrice = [&]() {
-        QString tripId = cbTrip->currentData().toString();
         unsigned long price = 0;
-        for (const auto& trip : trips) {
-            if (trip.getId() == tripId.toStdString()) {
-                for (const auto& route : routes) {
-                    if (route.getId() == trip.getRouteId()) {
-                        try {
-                            int distance = std::stoi(route.getDistance());
-                            price = distance * 1000; // 1000 VND per km
-                        } catch (...) {
-                            price = 100000; // Default if parsing fails
-                        }
-                        break;
-                    }
-                }
+        QString routeId = cbRoute->currentData().toString();
+        for (const auto& route : routes) {
+            if (route.getId() == routeId.toStdString()) {
+                try { price = FareCalculator::calculate(std::stol(route.getDistance())); } 
+                catch (...) { price = FareCalculator::MIN_FARE; }
                 break;
             }
         }
         QString priceStr = QString::number(price);
         int len = priceStr.length();
-        for (int i = len - 3; i > 0; i -= 3) {
-            priceStr.insert(i, ',');
-        }
+        for (int i = len - 3; i > 0; i -= 3) priceStr.insert(i, ',');
         lblPrice->setText("Price: " + priceStr + " VND");
         lblPrice->setProperty("price", QVariant::fromValue(static_cast<qulonglong>(price)));
     };
-    connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updatePrice);
-    updatePrice();
+
+    connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updateSeatsAndPrice);
+    connect(calTrip, &QCalendarWidget::selectionChanged, updateSeatsAndPrice);
     
-    formLayout->addRow("Trip:", cbTrip);
+    formLayout->addRow("Select Route:", cbRoute);
+    formLayout->addRow("Select Trip:", cbTrip);
     formLayout->addRow("Date:", calTrip);
     formLayout->addRow("Seat:", cbSeat);
     formLayout->addRow("Passenger:", txtName);
-    formLayout->addRow("Phone Number:", txtPhone);
-    formLayout->addRow("Payment Method:", cbPayment);
+    formLayout->addRow("Phone:", txtPhone);
+    formLayout->addRow("Payment:", cbPayment);
     formLayout->addRow("", lblPrice);
     
     QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    
     mainLayout->addLayout(formLayout);
     mainLayout->addWidget(btnBox);
     
     if (dialog.exec() == QDialog::Accepted) {
+        if (cbRoute->currentData().toString().isEmpty()) {
+            QMessageBox::warning(this, "Error", "Please select a Route!"); return;
+        }
+        if (calTrip->selectedDate() < QDate::currentDate()) {
+            QMessageBox::warning(this, "Error", "Cannot book ticket for a past date!"); return;
+        }
         if (txtName->text().isEmpty() || txtPhone->text().isEmpty()) {
-            QMessageBox::warning(this, "Error", "Please enter all information!");
-            return;
+            QMessageBox::warning(this, "Error", "Please enter passenger name and phone number!"); return;
         }
-        if (cbSeat->count() == 0 || cbSeat->currentData().toInt() == -1) {
-            QMessageBox::warning(this, "Error", "No seats available for this trip!");
-            return;
+        if (cbSeat->currentData().toInt() == -1) {
+            QMessageBox::warning(this, "Error", "Selected trip is full or no seat selected!"); return;
         }
-        
-        // Determine ticket file by trip: T005 -> TK005.txt
+    
         std::string tripId = cbTrip->currentData().toString().toStdString();
-        std::string fileId = "TK" + tripId.substr(1); // remove 'T'
-        std::string ticketPath = "Data/Ticket/" + fileId + ".txt";
+        std::string ticketPath = "Data/Ticket/" + tripId + ".txt";
 
-        // Find max ticket ID inside this trip file
         int maxTicketNum = 0;
-        {
-            std::ifstream in(ticketPath);
-            std::string ln;
-            while (std::getline(in, ln)) {
-                if (ln.empty()) continue;
-                try {
-                    Ticket t = Ticket::fromCSV(ln);
-                    std::string id = t.getId();
-                    if (id.rfind("TK", 0) == 0) {
-                        try {
-                            int num = std::stoi(id.substr(2));
-                            if (num > maxTicketNum) maxTicketNum = num;
-                        } catch (...) {}
-                    }
-                } catch (...) {}
+        for(const auto& t : tickets) {
+             std::string id = t.getId();
+             if (id.length() > 2 && id.substr(0,2) == "TK") {
+                 try { 
+                     int n = std::stoi(id.substr(2)); 
+                     if(n > maxTicketNum) maxTicketNum = n; 
+                 } catch(...) {}
             }
         }
+        
         int nextTicketNum = maxTicketNum + 1;
         std::stringstream tkSs;
         tkSs << "TK" << std::setw(3) << std::setfill('0') << nextTicketNum;
         std::string ticketId = tkSs.str();
-
         std::string busId;
         for (const auto& trip : trips) {
             if (trip.getId() == tripId) {
@@ -2661,18 +2604,14 @@ void AdminWindow::onBookTicketClicked() {
         }
         
         int seatNo = cbSeat->currentData().toInt();
-        
-        // Calculate price based on route distance
         unsigned long ticketPrice = lblPrice->property("price").toULongLong();
         
-        // Build bookedAt from selected date + current time
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
         char timebuf[20];
         std::strftime(timebuf, sizeof(timebuf), "%H:%M:%S", std::localtime(&time));
         std::string bookedAt = calTrip->selectedDate().toString("yyyy-MM-dd").toStdString() + " " + timebuf;
         
-        // Create ticket
         Ticket newTicket(
             ticketId,
             tripId,
@@ -2686,7 +2625,6 @@ void AdminWindow::onBookTicketClicked() {
         );
         tickets.push_back(newTicket);
 
-        // Append safely to trip file
         {
             std::fstream out(ticketPath, std::ios::in | std::ios::out | std::ios::app);
             if (!out.is_open()) {
@@ -2754,45 +2692,35 @@ void AdminWindow::onCancelTicketClicked() {
         std::string busId = itTicket->getBusId();
         std::string ticketId = itTicket->getId();
         std::string tripId = itTicket->getTripId();
-        
-        // Remove ticket from vector
         tickets.erase(tickets.begin() + ticketIndex);
+        std::string filepath = "Data/Ticket/" + tripId + ".txt"; 
         
-        // Find the ticket file (tickets are grouped by some criteria in files)
-        // Read all ticket files and rewrite the one that contains this ticket
-        std::string ticketDir = "Data/Ticket/";
-        for (const auto& entry : fs::directory_iterator(ticketDir)) {
-            if (entry.is_regular_file()) {
-                std::string filepath = entry.path().string();
-                
-                // Read all tickets from this file
-                std::vector<Ticket> fileTickets;
-                std::ifstream file(filepath);
-                std::string line;
-                bool foundTicket = false;
-                
-                while (std::getline(file, line)) {
+        if (fs::exists(filepath)) {
+            std::vector<Ticket> fileTickets;
+            std::ifstream file(filepath);
+            std::string line;
+            bool foundTicket = false;
+            
+            while (std::getline(file, line)) {
+                if (line.empty()) continue;
+                try {
                     Ticket t = Ticket::fromCSV(line);
                     if (t.getId() == ticketId) {
                         foundTicket = true;
-                        // Skip this ticket (don't add to vector)
                     } else {
                         fileTickets.push_back(t);
                     }
+                } catch(...) {}
+            }
+            file.close();
+
+            if (foundTicket) {
+                if (fileTickets.empty()) {
+                    std::remove(filepath.c_str());
+                } else {
+                    Ultil<Ticket>::saveToFile(filepath, fileTickets);
                 }
-                file.close();
-                
-                // If found, rewrite the file without the deleted ticket
-                if (foundTicket) {
-                    if (fileTickets.empty()) {
-                        // If no tickets left, delete the file
-                        std::remove(filepath.c_str());
-                    } else {
-                        // Rewrite file with remaining tickets
-                        Ultil<Ticket>::saveToFile(filepath, fileTickets);
-                    }
-                    break;
-                }
+                ticketsByFile[tripId] = fileTickets; 
             }
         }
         

@@ -1,4 +1,6 @@
 #include "UserWindow.h"
+#include "../Class/FareCalculator.h"
+#include "StyleHelper.h" 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -15,19 +17,21 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <QButtonGroup>
+#include <QDate>
+#include <set>
 
 UserWindow::UserWindow(QWidget *parent)
     : QWidget(parent)
 {
-    setupUI();
-    setupTabs();
     loadData();
+    setupUI();
     populateTrips();
     populateMyTickets();
     
     refreshTimer = new QTimer(this);
     connect(refreshTimer, &QTimer::timeout, this, &UserWindow::refreshData);
-    refreshTimer->start(5000); // Refresh every 5 seconds
+    refreshTimer->start(5000); 
 }
 
 UserWindow::~UserWindow() {
@@ -36,7 +40,6 @@ UserWindow::~UserWindow() {
 QIcon UserWindow::renderSvgIcon(const QString& resourcePath, const QSize& size, const QString& colorHex) {
     QFile file(resourcePath);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        qWarning() << "Failed to open SVG resource:" << resourcePath;
         return QIcon();
     }
     
@@ -48,17 +51,10 @@ QIcon UserWindow::renderSvgIcon(const QString& resourcePath, const QSize& size, 
     QByteArray svgData = svgContent.toUtf8();
     QSvgRenderer renderer(svgData);
     
-    if (!renderer.isValid()) {
-        qWarning() << "Invalid SVG content for:" << resourcePath;
-        return QIcon();
-    }
-    
     QPixmap pixmap(size);
     pixmap.fill(Qt::transparent);
     
     QPainter painter(&pixmap);
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform);
     renderer.render(&painter);
     
     return QIcon(pixmap);
@@ -73,216 +69,110 @@ void UserWindow::setupUI() {
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
     
-    // ===== SIDEBAR (Left) =====
     QWidget *sidebarWidget = new QWidget(this);
     sidebarWidget->setFixedWidth(280);
-    sidebarWidget->setStyleSheet(
-        "QWidget {"
-        "  background: #1a1f2e;"
-        "}"
-    );
+    sidebarWidget->setStyleSheet("background: #1a1f2e;");
     
     QVBoxLayout *sidebarLayout = new QVBoxLayout(sidebarWidget);
     sidebarLayout->setContentsMargins(0, 30, 0, 30);
     sidebarLayout->setSpacing(5);
     
-    // Logo/Title
     QLabel *lblLogo = new QLabel("USER PANEL", sidebarWidget);
-    lblLogo->setStyleSheet(
-        "font-size: 20px;"
-        "font-weight: 800;"
-        "color: #f1f5f9;"
-        "padding: 20px;"
-    );
+    lblLogo->setStyleSheet("font-size: 20px; font-weight: 800; color: #f1f5f9; padding: 20px;");
     lblLogo->setAlignment(Qt::AlignCenter);
     sidebarLayout->addWidget(lblLogo);
     
     sidebarLayout->addSpacing(20);
     
-    // Menu buttons
-    QStringList menuItems = {"Chuyến", "Vé của tôi"};
+    QStringList menuItems = {"Booking", "My Tickets"};
     QStringList menuIcons = {":/icons/icons/trip.svg", ":/icons/icons/ticket.svg"};
-    
-    QString activeButtonStyle = 
-        "QPushButton {"
-        "  background: #2563eb;"
-        "  color: #f1f5f9;"
-        "  border: none;"
-        "  border-radius: 8px;"
-        "  padding: 12px 20px;"
-        "  text-align: left;"
-        "  font-size: 14px;"
-        "  font-weight: 600;"
-        "  margin: 0 15px;"
-        "}"
-        "QPushButton:hover {"
-        "  background: #1d4ed8;"
-        "}";
-    
-    QString inactiveButtonStyle = 
-        "QPushButton {"
-        "  background: transparent;"
-        "  color: #cbd5e1;"
-        "  border: none;"
-        "  border-radius: 8px;"
-        "  padding: 12px 20px;"
-        "  text-align: left;"
-        "  font-size: 14px;"
-        "  font-weight: 600;"
-        "  margin: 0 15px;"
-        "}"
-        "QPushButton:hover {"
-        "  background: rgba(59, 130, 246, 0.1);"
-        "  color: #f1f5f9;"
-        "}";
     
     for (int i = 0; i < menuItems.count(); i++) {
         QPushButton *btn = new QPushButton(menuItems[i], sidebarWidget);
-        btn->setIcon(renderSvgIcon(menuIcons[i], QSize(24,24), QString("#cbd5e1")));
-        btn->setIconSize(QSize(24, 24));
+        btn->setIcon(renderSvgIcon(menuIcons[i], QSize(24,24), "#cbd5e1"));
         btn->setMinimumHeight(45);
         btn->setMinimumWidth(150);
-        btn->setFlat(true);
-        btn->setStyleSheet(i == 0 ? activeButtonStyle : inactiveButtonStyle);
-        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet("QPushButton { background: transparent; color: #cbd5e1; border: none; padding: 12px 20px; text-align: left; font-weight: 600; margin: 0 15px; } QPushButton:hover { background: rgba(59, 130, 246, 0.1); color: #f1f5f9; }");
         
-        if (i == 0) {
-            activeButton = btn;
-        }
-        
-        connect(btn, &QPushButton::clicked, [this, btn, activeButtonStyle, inactiveButtonStyle, i]() {
-            if (activeButton) {
-                activeButton->setStyleSheet(inactiveButtonStyle);
-            }
-            btn->setStyleSheet(activeButtonStyle);
-            activeButton = btn;
+        connect(btn, &QPushButton::clicked, [this, i]() {
             tabWidget->setCurrentIndex(i);
         });
         sidebarLayout->addWidget(btn);
     }
     
-    sidebarLayout->addSpacing(40);
+    sidebarLayout->addStretch();
     
-    // Logout button
     QPushButton *btnLogout = new QPushButton("Logout", sidebarWidget);
     btnLogout->setIcon(renderSvgIcon(":/icons/icons/logout.svg", QSize(20, 20), "#ef4444"));
-    btnLogout->setIconSize(QSize(20, 20));
-    btnLogout->setStyleSheet(
-        "QPushButton {"
-        "  background: rgba(239, 68, 68, 0.15);"
-        "  color: #ef4444;"
-        "  border: 1px solid #7f1d1d;"
-        "  border-radius: 8px;"
-        "  padding: 12px 20px;"
-        "  font-size: 14px;"
-        "  font-weight: 600;"
-        "  margin: 0 15px 15px 15px;"
-        "}"
-        "QPushButton:hover {"
-        "  background: rgba(239, 68, 68, 0.25);"
-        "}"
-    );
-    btnLogout->setMinimumHeight(40);
-    btnLogout->setCursor(Qt::PointingHandCursor);
+    btnLogout->setStyleSheet("QPushButton { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #7f1d1d; border-radius: 8px; padding: 12px 20px; font-weight: 600; margin: 0 15px 15px 15px; } QPushButton:hover { background: rgba(239, 68, 68, 0.25); }");
     connect(btnLogout, &QPushButton::clicked, this, &UserWindow::onLogoutClicked);
     
-    sidebarLayout->addStretch();
     sidebarLayout->addWidget(btnLogout);
     
-    // ===== MAIN CONTENT (Right) =====
     QWidget *contentWidget = new QWidget(this);
+    contentWidget->setStyleSheet("background: #0f172a;");
     QVBoxLayout *contentLayout = new QVBoxLayout(contentWidget);
     contentLayout->setContentsMargins(30, 30, 30, 30);
     contentLayout->setSpacing(20);
-    
-    // Header
+
     QLabel *lblTitle = new QLabel("USER PANEL", contentWidget);
-    lblTitle->setStyleSheet(
-        "font-size: 28px;"
-        "font-weight: 800;"
-        "color: #f1f5f9;"
-    );
+    lblTitle->setStyleSheet("font-size: 28px; font-weight: 800; color: #f1f5f9;");
     contentLayout->addWidget(lblTitle);
     
-    // Tab Widget (hidden tab bar)
     tabWidget = new QTabWidget(contentWidget);
-    tabWidget->setStyleSheet(
-        "QTabWidget::pane {"
-        "  border: none;"
-        "  background: transparent;"
-        "}"
-        "QTabBar::tab { height: 0px; width: 0px; }"
-    );
-    contentLayout->addWidget(tabWidget, 1);
+    tabWidget->tabBar()->hide();
+    tabWidget->setStyleSheet("QTabWidget::pane { border: none; background: transparent; }");
     
-    contentWidget->setStyleSheet("background: #0f172a;");
+    setupTabs();
     
-    // Add both to main layout
+    contentLayout->addWidget(tabWidget);
+    
     mainLayout->addWidget(sidebarWidget);
     mainLayout->addWidget(contentWidget, 1);
-    
     setLayout(mainLayout);
-    setStyleSheet("background: #0f172a;");
 }
 
 void UserWindow::setupTabs() {
-    // Trips tab with calendar and list
     QWidget *tripsTab = new QWidget(this);
     QVBoxLayout *tLayout = new QVBoxLayout(tripsTab);
     tLayout->setSpacing(10);
+    
+    QHBoxLayout *filterLayout = new QHBoxLayout();
+    QLabel *lblFilter = new QLabel("Select Route:", tripsTab);
+    lblFilter->setStyleSheet("font-weight: bold; color: #e2e8f0; font-size: 14px;");
+    
+    QComboBox *cbRoute = new QComboBox(tripsTab);
+    cbRoute->setObjectName("cbRouteFilter");
+    cbRoute->setStyleSheet("QComboBox { padding: 8px; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; min-width: 250px; } QComboBox::drop-down { border: none; }");
+    
+    cbRoute->addItem("All Routes", "");
+    for(const auto& r : routes) {
+        cbRoute->addItem(QString::fromStdString(r.getName()), QString::fromStdString(r.getId()));
+    }
+    
+    connect(cbRoute, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int){
+        populateTrips();
+    });
+    
+    filterLayout->addWidget(lblFilter);
+    filterLayout->addWidget(cbRoute);
+    filterLayout->addStretch();
+    tLayout->addLayout(filterLayout);
+    
     calendar = new QCalendarWidget(tripsTab);
+    calendar->setMinimumDate(QDate::currentDate()); 
     calendar->setStyleSheet(
-        "QCalendarWidget {"
-        "  background: #0f172a;"
-        "  color: #e2e8f0;"
-        "  border: 1px solid #1f2937;"
-        "  border-radius: 12px;"
-        "  selection-background-color: #2563eb;"
-        "  selection-color: #f8fafc;"
-        "}"
-        "QCalendarWidget QWidget#qt_calendar_navigationbar {"
-        "  background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f2937, stop:1 #0f172a);"
-        "  min-height: 46px;"
-        "  border-bottom: 1px solid #1f2937;"
-        "}"
-        "QCalendarWidget QToolButton {"
-        "  color: #e5e7eb;"
-        "  background: transparent;"
-        "  border: none;"
-        "  padding: 6px 12px;"
-        "  font-weight: 600;"
-        "  min-width: 20px;"
-        "}"
-        "QCalendarWidget QToolButton:hover { color: #3b82f6; }"
-        "QCalendarWidget QAbstractItemView {"
-        "  background: #0b1220;"
-        "  alternate-background-color: #111827;"
-        "  selection-background-color: #2563eb;"
-        "  selection-color: #f8fafc;"
-        "  outline: 0;"
-        "  font-weight: 600;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item {"
-        "  padding: 6px;"
-        "  margin: 2px;"
-        "  border-radius: 8px;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item:selected {"
-        "  background: #2563eb;"
-        "  color: #f8fafc;"
-        "}"
-        "QCalendarWidget QAbstractItemView::item:hover {"
-        "  background: rgba(59,130,246,0.18);"
-        "}"
-        "QCalendarWidget QSpinBox {"
-        "  background: #111827;"
-        "  color: #e5e7eb;"
-        "  border: 1px solid #1f2937;"
-        "  border-radius: 6px;"
-        "  padding: 2px 6px;"
-        "}"
+        "QCalendarWidget { background: #0f172a; color: #e2e8f0; border: 1px solid #1f2937; border-radius: 12px; selection-background-color: #2563eb; selection-color: #f8fafc; }"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #1f2937, stop:1 #0f172a); min-height: 46px; border-bottom: 1px solid #1f2937; }"
+        "QCalendarWidget QToolButton { color: #e5e7eb; background: transparent; border: none; padding: 6px; font-weight: 600; }"
+        "QCalendarWidget QAbstractItemView { background: #0b1220; alternate-background-color: #111827; selection-background-color: #2563eb; selection-color: #f8fafc; outline: 0; font-weight: 600; }"
+        "QCalendarWidget QAbstractItemView::item { padding: 6px; margin: 2px; border-radius: 8px; }"
+        "QCalendarWidget QAbstractItemView::item:selected { background: #2563eb; color: #f8fafc; }"
+        "QCalendarWidget QAbstractItemView::item:hover { background: rgba(59,130,246,0.18); }"
+        "QCalendarWidget QWidget { alternate-background-color: #0f172a; }"
     );
     tLayout->addWidget(calendar);
+    
     tripTable = new QTableWidget(tripsTab);
     tripTable->setStyleSheet(StyleHelper::getTableStyle());
     tripTable->setColumnCount(5);
@@ -290,20 +180,19 @@ void UserWindow::setupTabs() {
     tripTable->horizontalHeader()->setStretchLastSection(true);
     tripTable->verticalHeader()->setVisible(false);
     tripTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
+    tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     tLayout->addWidget(tripTable);
-    QPushButton *btnBook = new QPushButton("Book tickets", tripsTab);
+    
+    QPushButton *btnBook = new QPushButton("Book Tickets", tripsTab);
     btnBook->setIcon(renderSvgIcon(":/icons/icons/ticket-add.svg", QSize(16,16), "#22c55e"));
-    btnBook->setIconSize(QSize(16,16));
     btnBook->setStyleSheet(StyleHelper::getSuccessButtonStyle());
-    btnBook->setCursor(Qt::PointingHandCursor);
     connect(btnBook, &QPushButton::clicked, this, &UserWindow::onBookTicketClicked);
-    QPushButton *btnViewSeat = new QPushButton("View seat map", tripsTab);
+    
+    QPushButton *btnViewSeat = new QPushButton("View Seat Map", tripsTab);
     btnViewSeat->setIcon(renderSvgIcon(":/icons/icons/seat-map.svg", QSize(16,16), "#3b82f6"));
-    btnViewSeat->setIconSize(QSize(16,16));
     btnViewSeat->setStyleSheet(StyleHelper::getPrimaryButtonStyle());
-    btnViewSeat->setCursor(Qt::PointingHandCursor);
     connect(btnViewSeat, &QPushButton::clicked, this, &UserWindow::onViewSeatMapClicked);
+    
     QHBoxLayout *actions = new QHBoxLayout();
     actions->addWidget(btnBook);
     actions->addWidget(btnViewSeat);
@@ -311,7 +200,6 @@ void UserWindow::setupTabs() {
     tLayout->addLayout(actions);
     tabWidget->addTab(tripsTab, "Trips");
 
-    // My Tickets tab
     QWidget *myTab = new QWidget(this);
     QVBoxLayout *mLayout = new QVBoxLayout(myTab);
     myTicketsTable = new QTableWidget(myTab);
@@ -321,13 +209,12 @@ void UserWindow::setupTabs() {
     myTicketsTable->horizontalHeader()->setStretchLastSection(true);
     myTicketsTable->verticalHeader()->setVisible(false);
     myTicketsTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        myTicketsTable->setEditTriggers(QAbstractItemView::NoEditTriggers); // Disable editing
+    myTicketsTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     mLayout->addWidget(myTicketsTable);
-    QPushButton *btnCancel = new QPushButton("Cancel ticket", myTab);
+    
+    QPushButton *btnCancel = new QPushButton("Cancel Ticket", myTab);
     btnCancel->setIcon(renderSvgIcon(":/icons/icons/ticket-cancel.svg", QSize(16,16), "#ef4444"));
-    btnCancel->setIconSize(QSize(16,16));
     btnCancel->setStyleSheet(StyleHelper::getDangerButtonStyle());
-    btnCancel->setCursor(Qt::PointingHandCursor);
     connect(btnCancel, &QPushButton::clicked, this, &UserWindow::onCancelMyTicketClicked);
 
     QPushButton *btnExport = new QPushButton("Export CSV", myTab);
@@ -346,32 +233,57 @@ void UserWindow::setupTabs() {
 }
 
 void UserWindow::loadData() {
-    // Minimal data load for user
     routes.clear(); buses.clear(); trips.clear(); tickets.clear();
     std::string line;
+    
     std::ifstream routeFile("Data/Route.txt");
     while (std::getline(routeFile, line)) { if (!line.empty()) routes.push_back(Route::fromCSV(line)); }
     std::ifstream busFile("Data/Bus.txt");
     while (std::getline(busFile, line)) { if (!line.empty()) buses.push_back(Bus::fromCSV(line)); }
     std::ifstream tripFile("Data/Trip.txt");
     while (std::getline(tripFile, line)) { if (!line.empty()) trips.push_back(Trip::fromCSV(line)); }
-    for (int i=1;i<=100;i++){ std::string fid = "TK" + std::string(3-std::to_string(i).length(),'0') + std::to_string(i);
-        std::ifstream tf("Data/Ticket/"+fid+".txt"); if (!tf.is_open()) continue; while (std::getline(tf,line)){
-            if (!line.empty()) { try { tickets.push_back(Ticket::fromCSV(line)); } catch(...){} }
-        }}
+
+    for (const auto& t : trips) {
+        std::string path = "Data/Ticket/" + t.getId() + ".txt";
+        std::ifstream tf(path);
+        if (tf.is_open()) {
+            while (std::getline(tf, line)) {
+                if (!line.empty()) {
+                    try { tickets.push_back(Ticket::fromCSV(line)); } catch(...) {}
+                }
+            }
+            tf.close();
+        }
+    }
 }
 
-void UserWindow::populateTrips() {
+void UserWindow::populateTrips(QString routeId) {
     tripTable->setRowCount(0);
+    
+    if (routeId.isEmpty()) {
+        QComboBox *cb = findChild<QComboBox*>("cbRouteFilter");
+        if (cb) routeId = cb->currentData().toString();
+    }
+    
     std::map<std::string, Route> routeMap; for (auto &r: routes) routeMap[r.getId()]=r;
     std::map<std::string, Bus> busMap; for (auto &b: buses) busMap[b.getId()]=b;
-    for (size_t i=0;i<trips.size();++i){ const Trip &tr = trips[i];
+    
+    for (size_t i=0;i<trips.size();++i){ 
+        const Trip &tr = trips[i];
+        
+        if (!routeId.isEmpty() && tr.getRouteId() != routeId.toStdString()) {
+            continue;
+        }
+        
         int row = tripTable->rowCount(); tripTable->insertRow(row);
         tripTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tr.getId())));
-        auto rt = routeMap[tr.getRouteId()];
-        tripTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(rt.getName())));
-        auto bs = busMap[tr.getBusId()];
-        tripTable->setItem(row,2,new QTableWidgetItem(QString::fromStdString(bs.getName())));
+        
+        QString rName = routeMap.count(tr.getRouteId()) ? QString::fromStdString(routeMap[tr.getRouteId()].getName()) : "";
+        tripTable->setItem(row,1,new QTableWidgetItem(rName));
+        
+        QString bName = busMap.count(tr.getBusId()) ? QString::fromStdString(busMap[tr.getBusId()].getName()) : "";
+        tripTable->setItem(row,2,new QTableWidgetItem(bName));
+        
         tripTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tr.getDepart())));
         tripTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tr.getArrival())));
     }
@@ -379,10 +291,8 @@ void UserWindow::populateTrips() {
 
 void UserWindow::populateMyTickets() {
     myTicketsTable->setRowCount(0);
-    
     std::string userName = currentUser.getUsername();
     std::string userPhone = currentUser.getPhoneNumber();
-    
     if (userName.empty()) return;
     
     // Build quick lookups
@@ -392,7 +302,6 @@ void UserWindow::populateMyTickets() {
 
     for (size_t idx = 0; idx < tickets.size(); idx++){ 
         const auto &tk = tickets[idx];
-        
         bool matchName = (tk.getPassengerName() == userName);
         bool matchPhone = (!userPhone.empty() && tk.getPhoneNumber() == userPhone);
 
@@ -420,62 +329,67 @@ void UserWindow::populateMyTickets() {
 }
 
 void UserWindow::onBookTicketClicked() {
-    // Validate current user
     std::string userName = currentUser.getUsername();
     std::string userPhone = currentUser.getPhoneNumber(); 
 
-    if (userName.empty()) { QMessageBox::warning(this, "Book ticket", "Error: User not logged in"); return; }
+    if (userName.empty()) { QMessageBox::warning(this, "Book Ticket", "Error: User not logged in"); return; }
     
-    // Use selected trip
     auto items = tripTable->selectedItems();
-    if (items.isEmpty()) { QMessageBox::warning(this, "Book ticket", "Select a trip to book"); return; }
+    if (items.isEmpty()) { QMessageBox::warning(this, "Book Ticket", "Select a trip to book"); return; }
     int row = items.first()->row();
     QString tripId = tripTable->item(row,0)->text();
 
-    // Find trip and busId, get price
     std::string busId; unsigned long tripPrice = 0;
     for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; } }
-    if (busId.empty()) { QMessageBox::warning(this, "Book ticket", "Error: Bus not found"); return; }
+    if (busId.empty()) { QMessageBox::warning(this, "Book Ticket", "Error: Bus not found"); return; }
+    
     int capacity = 40; for (const auto &b : buses){ if (b.getId()==busId) { capacity = b.getCapacity(); break; } }
-    for (const auto &r : routes){ for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString() && tr.getRouteId()==r.getId()){ try { tripPrice = std::stol(r.getDistance()) * 1000; } catch(...) { tripPrice = 100000; } break; } } }
+    
+    for (const auto &r : routes){
+         for (const auto &tr : trips){ 
+            if (tr.getId()==tripId.toStdString() && tr.getRouteId()==r.getId()){ 
+                try{ tripPrice = FareCalculator::calculate(std::stol(r.getDistance())); } 
+                catch(...){ tripPrice = FareCalculator::MIN_FARE; } 
+                break; 
+            } 
+        } 
+    }
     
     QString dateStr = calendar->selectedDate().toString("yyyy-MM-dd");
     std::set<int> booked;
     for (const auto &t: tickets){ if (t.getBusId()==busId){ std::string bAt = t.getBookedAt(); if (bAt.rfind(dateStr.toStdString(),0)==0){ booked.insert(t.getSeatNo()); } } }
     
-    // Create dialog with all inputs
     QDialog dlg(this);
-    dlg.setWindowTitle("Book tickets trip " + tripId);
+    dlg.setWindowTitle("Book Ticket");
+    dlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
+    dlg.setMinimumWidth(400);
     QVBoxLayout *layout = new QVBoxLayout(&dlg);
     
-    layout->addWidget(new QLabel(QString("Departure date: %1").arg(dateStr), &dlg));
+    layout->addWidget(new QLabel(QString("Date: %1").arg(dateStr), &dlg));
     
     QLineEdit *nameEdit = new QLineEdit(&dlg);
-    nameEdit->setPlaceholderText("Enter passenger name");
+    nameEdit->setPlaceholderText("Passenger Name");
     nameEdit->setStyleSheet(StyleHelper::getInputStyle());
     layout->addWidget(nameEdit);
 
     QLineEdit *phoneEdit = new QLineEdit(&dlg);
-    phoneEdit->setPlaceholderText("Phone number");
+    phoneEdit->setPlaceholderText("Phone Number");
     phoneEdit->setStyleSheet(StyleHelper::getInputStyle());
     phoneEdit->setText(QString::fromStdString(userPhone)); 
-    //if (!userPhone.empty()) phoneEdit->setReadOnly(true); (Khong cho phép sửa SĐT)
     layout->addWidget(phoneEdit);
     
     QComboBox *payment = new QComboBox(&dlg);
-    payment->addItems({"Tien mat","Momo","ZaloPay","VNPay"});
+    payment->setStyleSheet(StyleHelper::getInputStyle());
+    payment->addItems({"Cash","Momo","ZaloPay","Bank Transfer"});
     layout->addWidget(payment);
     
-    // Seat selection grid
     QWidget *seatGrid = new QWidget(&dlg);
     QGridLayout *grid = new QGridLayout(seatGrid);
-    grid->setSpacing(6);
     QButtonGroup *seatGroup = new QButtonGroup(&dlg);
     seatGroup->setExclusive(false); 
     int cols = 4;
     std::set<int> selectedSeats;
     
-        // Price preview label
     QLabel *pricePreview = new QLabel(QString("Total: 0 VND"), &dlg);
     pricePreview->setStyleSheet("font-size: 16px; font-weight: bold; color: #22c55e; padding: 10px;");
     pricePreview->setAlignment(Qt::AlignCenter);
@@ -483,30 +397,29 @@ void UserWindow::onBookTicketClicked() {
     for (int i=1;i<=capacity;i++){
         QPushButton *btn = new QPushButton(QString::number(i), seatGrid);
         btn->setCheckable(true);
-        btn->setFixedSize(50, 50);
+        btn->setFixedSize(45, 45);
         bool isBooked = booked.count(i)>0;
         if (isBooked) {
             btn->setEnabled(false);
-            btn->setStyleSheet("QPushButton { background: #dc2626; color: #fff; border: 1px solid #991b1b; border-radius: 6px; font-weight: 600; }");
+            btn->setStyleSheet("background: #ef4444; color: white; border: none; border-radius: 4px;");
         } else {
-            btn->setStyleSheet("QPushButton { background: #1f2937; color: #e5e7eb; border: 1px solid #334155; border-radius: 6px; } QPushButton:checked { background: #2563eb; color: #f8fafc; font-weight: 700; }");
+            btn->setStyleSheet("QPushButton { background: #334155; color: white; border: none; border-radius: 4px; } QPushButton:checked { background: #22c55e; }");
             seatGroup->addButton(btn, i);
-            // Update price preview when seat is selected/deselected
-            QObject::connect(btn, &QPushButton::toggled, [&, i, pricePreview, tripPrice](bool checked) {
+            connect(btn, &QPushButton::toggled, [&, i, pricePreview, tripPrice](bool checked) {
                 if (checked) { selectedSeats.insert(i); } else { selectedSeats.erase(i); }
                 unsigned long totalPrice = selectedSeats.size() * tripPrice;
                 pricePreview->setText(QString("Total: %1 VND").arg(totalPrice));
             });
         }
-        int r = (i-1)/cols, c = (i-1)%cols; grid->addWidget(btn, r, c);
+        grid->addWidget(btn, (i-1)/cols, (i-1)%cols);
     }
     layout->addWidget(seatGrid);
     layout->addWidget(pricePreview);
     
     QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     layout->addWidget(buttons);
-    QObject::connect(buttons, &QDialogButtonBox::accepted, [&](){ dlg.accept(); });
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, [&](){ dlg.accept(); });
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
     
     if (dlg.exec() != QDialog::Accepted) return;
     
@@ -514,33 +427,23 @@ void UserWindow::onBookTicketClicked() {
     QString inputPhone = phoneEdit->text().trimmed();
     QString pay = payment->currentText();
     
-    if (inputName.isEmpty()) { QMessageBox::warning(this,"Book ticket","Please enter passenger name"); return; }
-    if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Book ticket","Please enter phone number"); return; }
-    if (selectedSeats.empty()){ QMessageBox::warning(this,"Book ticket","Please select at least one seat"); return; }
+    if (inputName.isEmpty()) { QMessageBox::warning(this,"Book Ticket","Please enter passenger name"); return; }
+    if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Book Ticket","Please enter phone number"); return; }
+    if (selectedSeats.empty()){ QMessageBox::warning(this,"Book Ticket","Please select at least one seat"); return; }
     
-    // Determine file based on trip ID: T005 -> TK005.txt
-    std::string fileId = "TK" + tripId.mid(1).toStdString(); 
-
-    // Scan trip file once to find max ticket ID
+    std::string ticketPath = "Data/Ticket/" + tripId.toStdString() + ".txt";
     int maxTkNum = 0;
-    {
-        std::ifstream in("Data/Ticket/" + fileId + ".txt");
-        std::string ln;
-        while (std::getline(in, ln)) {
-            if (ln.empty()) continue;
+    for (const auto& t : tickets) {
+        std::string id = t.getId();
+        if (id.length() > 2 && id.substr(0, 2) == "TK") {
             try {
-                Ticket t = Ticket::fromCSV(ln);
-                std::string id = t.getId();
-                if (id.rfind("TK", 0) == 0) {
-                    try { int num = std::stoi(id.substr(2)); if (num > maxTkNum) maxTkNum = num; } catch (...) {}
-                }
-            } catch (...) {}
+                int num = std::stoi(id.substr(2));
+                if (num > maxTkNum) maxTkNum = num;
+            } catch(...) {}
         }
     }
 
-    std::string nameStr = inputName.toStdString();
-    std::string phoneStr = inputPhone.toStdString();
-    std::string payStr = pay.toStdString();
+    std::ofstream out(ticketPath, std::ios::app);
     std::string bookedAtStr = (dateStr + " 00:00").toStdString();
     
     try {
@@ -567,29 +470,11 @@ void UserWindow::onBookTicketClicked() {
                 int row = myTicketsTable->rowCount();
                 myTicketsTable->insertRow(row);
                 myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-                // Format Trip as Start - End
-                QString tripDisplay = QString::fromStdString(tk.getTripId());
-                for (const auto &tr : trips) {
-                    if (tr.getId() == tk.getTripId()) {
-                        for (const auto &rt : routes) {
-                            if (rt.getId() == tr.getRouteId()) {
-                                tripDisplay = QString::fromStdString(rt.getStart() + " - " + rt.getEnd());
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-                myTicketsTable->setItem(row,1,new QTableWidgetItem(tripDisplay));
+                myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
                 myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
                 myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
                 myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-                {
-                    QString s = QString::number(tk.getPrice());
-                    for (int i=s.length()-3;i>0;i-=3) s.insert(i, '.');
-                    s += "vnd";
-                    myTicketsTable->setItem(row,5,new QTableWidgetItem(s));
-                }
+                myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
                 myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
             }
             out.close();
@@ -603,83 +488,77 @@ void UserWindow::onBookTicketClicked() {
 
 void UserWindow::onViewSeatMapClicked() {
     auto items = tripTable->selectedItems();
-    if (items.isEmpty()) { QMessageBox::warning(this, "Seat map", "Select a trip"); return; }
+    if (items.isEmpty()) { QMessageBox::warning(this, "Seat Map", "Select a trip"); return; }
     int row = items.first()->row();
     QString tripId = tripTable->item(row,0)->text();
-    std::string busId; for (const auto &tr : trips){ if (tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; } }
-    if (busId.empty()) { QMessageBox::warning(this, "Seat map", "Bus not found"); return; }
+    std::string busId; 
+    for(const auto &tr : trips) if(tr.getId()==tripId.toStdString()) { busId = tr.getBusId(); break; }
+    
     QString dateStr = calendar->selectedDate().toString("yyyy-MM-dd");
     std::set<int> booked;
-    for (const auto &t: tickets){ if (t.getBusId()==busId){ std::string bAt = t.getBookedAt(); if (bAt.rfind(dateStr.toStdString(),0)==0){ booked.insert(t.getSeatNo()); } } }
-    
-    // Show visual seat map
-    QDialog dlg(this); dlg.setWindowTitle("Seat map"); dlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
-    QVBoxLayout *lay = new QVBoxLayout(&dlg);
-    lay->addWidget(new QLabel(QString("Date %1 - Bus %2").arg(dateStr).arg(QString::fromStdString(busId))));
-    
-    QWidget *seatWidget = new QWidget(); QGridLayout *gl = new QGridLayout(seatWidget);
-    int busCapacity = 0; for (const auto &b: buses){ if (b.getId()==busId) { busCapacity=b.getCapacity(); break; } }
-    int cols = 4;
-    
-    for (int i=1; i<=busCapacity; i++){
-        QPushButton *btn = new QPushButton(QString::number(i)); btn->setMinimumSize(50,50);
-        QString style;
-        if (booked.count(i)) style = "background: #dc2626; color: white; border: none; border-radius: 4px; font-weight: bold;";
-        else style = "background: #1f2937; color: white; border: 1px solid #374151; border-radius: 4px;";
-        btn->setStyleSheet(style); btn->setDisabled(true);
-        gl->addWidget(btn, (i-1)/cols, (i-1)%cols);
+    for(const auto &tk : tickets) {
+        if(tk.getBusId()==busId && QString::fromStdString(tk.getBookedAt()).startsWith(dateStr)) 
+            booked.insert(tk.getSeatNo());
     }
-    lay->addWidget(seatWidget);
-    QDialogButtonBox *btns = new QDialogButtonBox(QDialogButtonBox::Ok, &dlg); 
-    lay->addWidget(btns); QObject::connect(btns, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    
+    QDialog dlg(this);
+    dlg.setWindowTitle("Seat Map - " + dateStr);
+    dlg.setStyleSheet("background: #0f172a; color: #e5e7eb;");
+    QVBoxLayout *lay = new QVBoxLayout(&dlg);
+    
+    QTableWidget *tw = new QTableWidget(&dlg);
+    tw->setColumnCount(3);
+    tw->setHorizontalHeaderLabels({"Seat","Status","Info"});
+    tw->setStyleSheet(StyleHelper::getTableStyle());
+    lay->addWidget(tw);
+    
+    int capacity = 0;
+    for(const auto &b : buses) if(b.getId()==busId) { capacity = b.getCapacity(); break; }
+    
+    tw->setRowCount(capacity);
+    for(int i=1; i<=capacity; i++) {
+        tw->setItem(i-1, 0, new QTableWidgetItem(QString::number(i)));
+        bool isBooked = booked.count(i);
+        QTableWidgetItem *st = new QTableWidgetItem(isBooked ? "Booked" : "Available");
+        st->setForeground(isBooked ? Qt::red : Qt::green);
+        tw->setItem(i-1, 1, st);
+    }
+    
+    QDialogButtonBox *box = new QDialogButtonBox(QDialogButtonBox::Ok, &dlg);
+    connect(box, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    lay->addWidget(box);
+    
     dlg.exec();
 }
 
 void UserWindow::onCancelMyTicketClicked() {
     auto items = myTicketsTable->selectedItems();
-    if (items.isEmpty()){ QMessageBox::warning(this,"Cancel ticket","Select a ticket to cancel"); return; }
+    if (items.isEmpty()) return;
     int row = items.first()->row();
-    QString id = myTicketsTable->item(row,0)->text();
-    std::string idStr = id.toStdString();
-
-    // Find ticket in memory to know its trip (and file)
-    auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket &t){ return t.getId() == idStr; });
-    if (it == tickets.end()) { QMessageBox::warning(this,"Cancel ticket","Ticket not found"); return; }
-
-    std::string tripIdStr = it->getTripId();
-    if (tripIdStr.empty() || tripIdStr.size() < 2 || tripIdStr[0] != 'T') {
-        QMessageBox::warning(this,"Cancel ticket","Cannot determine ticket file");
-        return;
-    }
-
-    // File mapping: T005 -> TK005.txt
-    std::string fileId = "TK" + tripIdStr.substr(1) + ".txt";
-
-    // Read file for this trip and remove the target ticket by ID
-    std::vector<std::string> keptLines;
-    {
-        std::ifstream in(std::string("Data/Ticket/") + fileId);
+    std::string id = myTicketsTable->item(row,0)->text().toStdString();
+    auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
+    if(it == tickets.end()) return;
+    std::string tripId = it->getTripId(); 
+    tickets.erase(it);
+    if(tripId.length() > 0) {
+        std::string path = "Data/Ticket/" + tripId + ".txt";
+        std::vector<std::string> lines;
+        std::ifstream in(path); 
         std::string ln;
-        while (std::getline(in, ln)) {
-            if (ln.empty()) continue;
+        while(std::getline(in, ln)) {
+            if(ln.empty()) continue;
             try {
                 Ticket t = Ticket::fromCSV(ln);
-                if (t.getId() == idStr) continue; // skip cancelled
-            } catch (...) {
-                // If parse fails, keep line to avoid data loss
-            }
-            keptLines.push_back(ln);
+                if(t.getId() != id) lines.push_back(ln);
+            } catch(...) { lines.push_back(ln); }
         }
+        in.close();
+        std::ofstream out(path, std::ios::trunc);
+        for(const auto &l : lines) out << l << "\n";
+        out.close();
     }
-
-    std::ofstream out(std::string("Data/Ticket/") + fileId, std::ios::trunc);
-    for (const auto &ln : keptLines) out << ln << "\n";
-    out.close();
-
-    // Update memory: remove the cancelled ticket globally
-    tickets.erase(std::remove_if(tickets.begin(), tickets.end(), [&](const Ticket&t){ return t.getId()==idStr; }), tickets.end());
     populateMyTickets();
-    QMessageBox::information(this, "Cancel ticket", "Ticket cancelled successfully");
+    QMessageBox::information(this, "Success", "Ticket cancelled");
 }
 
 void UserWindow::onLogoutClicked() {
@@ -724,14 +603,12 @@ void UserWindow::onExportMyTicketsCsv() {
 }
 
 void UserWindow::refreshData() {
-    // Reload data from files
     loadData();
-    // Update tables
     populateTrips();
     populateMyTickets();
 }
 
 void UserWindow::showEvent(QShowEvent *event) {
     QWidget::showEvent(event);
-    refreshData(); // Force reload when the window becomes visible
+    refreshData();
 }

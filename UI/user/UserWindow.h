@@ -2,37 +2,32 @@
 #define USERWINDOW_H
 
 #include <QWidget>
-#include <QPushButton>
-#include <QButtonGroup>
-#include <QTabWidget>
-#include <QCalendarWidget>
 #include <QTableWidget>
+#include <QPushButton>
+#include <QCalendarWidget>
+#include <QTabWidget>
 #include <QTimer>
+#include <QComboBox>
 #include <QShowEvent>
-#include "../Class/User.h"
-#include "StyleHelper.h"
-#include "../Class/Route.h"
-#include "../Class/Bus.h"
-#include "../Class/Trip.h"
-#include "../Class/Ticket.h"
 #include <vector>
-#include <QDir>
-#include <QDateTime>
+#include "../../Class/User.h"
+#include "../../Class/Route.h"
+#include "../../Class/Bus.h"
+#include "../../Class/Trip.h"
+#include "../../Class/Ticket.h"
 
 class UserWindow : public QWidget {
     Q_OBJECT
-
 public:
     explicit UserWindow(QWidget *parent = nullptr);
     ~UserWindow();
     void setUser(User user);
-protected:
-    void showEvent(QShowEvent *event) override; // Refresh when window is shown
-    
-    static QIcon renderSvgIcon(const QString& resourcePath, const QSize& size = QSize(24, 24), const QString& colorHex = "#cbd5e1");
 
 signals:
     void logout();
+
+protected:
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void onBookTicketClicked();
@@ -43,26 +38,28 @@ private slots:
     void refreshData();
 
 private:
+    void setupUI();
+    void setupTabs();
+    void loadData();
+    void populateTrips(QString routeId = ""); 
+    void populateMyTickets();
+    
+    QIcon renderSvgIcon(const QString& resourcePath, const QSize& size, const QString& colorHex);
+
     User currentUser;
     QTabWidget *tabWidget;
-    QCalendarWidget *calendar;
+    QPushButton *activeButton = nullptr;
+    
     QTableWidget *tripTable;
     QTableWidget *myTicketsTable;
-    QString ticketSearch;
-    QPushButton *activeButton = nullptr;
-    QTimer *refreshTimer;
+    QCalendarWidget *calendar;
 
-    // Data
     std::vector<Route> routes;
     std::vector<Bus> buses;
     std::vector<Trip> trips;
     std::vector<Ticket> tickets;
-
-    void setupUI();
-    void setupTabs();
-    void loadData();
-    void populateTrips();
-    void populateMyTickets();
+    
+    QTimer *refreshTimer;
 };
 
-#endif // USERWINDOW_H
+#endif 
