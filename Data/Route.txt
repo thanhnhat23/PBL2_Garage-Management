@@ -29,3 +29,4 @@ R028,Da Nang - Soc Trang,Da Nang,Soc Trang,1100,1320
 R029,Da Nang - Bac Giang,Da Nang,Bac Giang,780,960
 R030,Da Nang - Hai Duong,Da Nang,Hai Duong,760,940
 R032,Ha Noi - Hue,Ha Noi,Hue,1500,2314
+R033,Ho Chi Minh - Hoi An,Ho Chi Minh,Hoi An,900,3600
