@@ -223,18 +223,24 @@ void UserWindow::setupTabs() {
 void UserWindow::loadData() {
     routes.clear(); buses.clear(); trips.clear(); tickets.clear();
     std::string line;
+    
     std::ifstream routeFile("Data/Route.txt");
     while (std::getline(routeFile, line)) { if (!line.empty()) routes.push_back(Route::fromCSV(line)); }
     std::ifstream busFile("Data/Bus.txt");
     while (std::getline(busFile, line)) { if (!line.empty()) buses.push_back(Bus::fromCSV(line)); }
     std::ifstream tripFile("Data/Trip.txt");
     while (std::getline(tripFile, line)) { if (!line.empty()) trips.push_back(Trip::fromCSV(line)); }
-    for (int i=1;i<=100;i++){ 
-        std::string fid = "TK" + std::string(3-std::to_string(i).length(),'0') + std::to_string(i);
-        std::ifstream tf("Data/Ticket/"+fid+".txt"); 
-        if (!tf.is_open()) continue; 
-        while (std::getline(tf,line)){
-            if (!line.empty()) { try { tickets.push_back(Ticket::fromCSV(line)); } catch(...){} }
+
+    for (const auto& t : trips) {
+        std::string path = "Data/Ticket/" + t.getId() + ".txt";
+        std::ifstream tf(path);
+        if (tf.is_open()) {
+            while (std::getline(tf, line)) {
+                if (!line.empty()) {
+                    try { tickets.push_back(Ticket::fromCSV(line)); } catch(...) {}
+                }
+            }
+            tf.close();
         }
     }
 }
@@ -399,21 +405,15 @@ void UserWindow::onBookTicketClicked() {
     if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Book Ticket","Please enter phone number"); return; }
     if (selectedSeats.empty()){ QMessageBox::warning(this,"Book Ticket","Please select at least one seat"); return; }
     
-    std::string fileId = "TK" + tripId.mid(1).toStdString(); 
-    std::string ticketPath = "Data/Ticket/" + fileId + ".txt";
+    std::string ticketPath = "Data/Ticket/" + tripId.toStdString() + ".txt";
     int maxTkNum = 0;
-    
-    {
-        std::ifstream in(ticketPath); std::string ln;
-        while (std::getline(in, ln)) {
-            if (ln.empty()) continue;
+    for (const auto& t : tickets) {
+        std::string id = t.getId();
+        if (id.length() > 2 && id.substr(0, 2) == "TK") {
             try {
-                Ticket t = Ticket::fromCSV(ln);
-                if (t.getId().rfind("TK", 0) == 0) {
-                    int num = std::stoi(t.getId().substr(2));
-                    if (num > maxTkNum) maxTkNum = num;
-                }
-            } catch (...) {}
+                int num = std::stoi(id.substr(2));
+                if (num > maxTkNum) maxTkNum = num;
+            } catch(...) {}
         }
     }
 
@@ -489,18 +489,15 @@ void UserWindow::onCancelMyTicketClicked() {
     if (items.isEmpty()) return;
     int row = items.first()->row();
     std::string id = myTicketsTable->item(row,0)->text().toStdString();
-    
-    auto it = std::remove_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
+    auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
     if(it == tickets.end()) return;
     std::string tripId = it->getTripId(); 
-    tickets.erase(it, tickets.end());
-    
-    if(tripId.length() > 1) {
-        std::string fileId = "TK" + tripId.substr(1);
-        std::string path = "Data/Ticket/" + fileId + ".txt";
-        
+    tickets.erase(it);
+    if(tripId.length() > 0) {
+        std::string path = "Data/Ticket/" + tripId + ".txt";
         std::vector<std::string> lines;
-        std::ifstream in(path); std::string ln;
+        std::ifstream in(path); 
+        std::string ln;
         while(std::getline(in, ln)) {
             if(ln.empty()) continue;
             try {
@@ -509,11 +506,10 @@ void UserWindow::onCancelMyTicketClicked() {
             } catch(...) { lines.push_back(ln); }
         }
         in.close();
-        
-        std::ofstream out(path);
+        std::ofstream out(path, std::ios::trunc);
         for(const auto &l : lines) out << l << "\n";
+        out.close();
     }
-    
     populateMyTickets();
     QMessageBox::information(this, "Success", "Ticket cancelled");
 }
