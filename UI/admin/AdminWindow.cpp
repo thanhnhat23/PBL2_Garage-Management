@@ -1987,7 +1987,7 @@ void AdminWindow::onDeleteBusClicked() {
     int row = table->row(items.first());
     QString busId = table->item(row, 0)->data(Qt::UserRole).toString();
     
-    auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected bus? This will remove drivers and seats.");
+    auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected bus? This will remove drivers, seats, and related tickets.");
     if (reply == QMessageBox::Yes) {
         std::string targetId = busId.toStdString();
         
@@ -2006,6 +2006,34 @@ void AdminWindow::onDeleteBusClicked() {
         seats.erase(itS, seats.end());
         std::string sPath = "Data/Seat/" + targetId + ".txt";
         if (fs::exists(sPath)) fs::remove(sPath);
+        
+        // Remove tickets related to this bus from all trip files
+        auto itT = std::remove_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getBusId() == targetId; });
+        tickets.erase(itT, tickets.end());
+        
+        // Update all trip ticket files to remove tickets for this bus
+        for (const auto& trip : trips) {
+            std::string tPath = "Data/Ticket/" + trip.getId() + ".txt";
+            if (fs::exists(tPath)) {
+                std::vector<Ticket> tripTickets;
+                std::ifstream in(tPath);
+                std::string line;
+                while (std::getline(in, line)) {
+                    if (line.empty()) continue;
+                    try {
+                        Ticket t = Ticket::fromCSV(line);
+                        if (t.getBusId() != targetId) tripTickets.push_back(t);
+                    } catch(...) {}
+                }
+                in.close();
+                
+                if (tripTickets.empty()) {
+                    fs::remove(tPath);
+                } else {
+                    Ultil<Ticket>::saveToFile(tPath, tripTickets);
+                }
+            }
+        }
         
         populateBusesTable();
     }
@@ -2057,11 +2085,31 @@ void AdminWindow::onDeleteTripClicked() {
     if (items.empty()) return;
     int row = table->row(items.first());
     QString tripId = table->item(row, 0)->data(Qt::UserRole).toString();
+    std::string targetId = tripId.toStdString();
     
-    auto reply = QMessageBox::question(this, "Confirm Delete", "Delete selected trip?");
+    // Check if trip has tickets
+    auto hasTickets = std::any_of(tickets.begin(), tickets.end(),
+        [&](const Ticket& t){ return t.getTripId() == targetId; });
+    
+    QString confirmMsg = "Delete selected trip?";
+    if (hasTickets) {
+        confirmMsg += "\n\nWarning: This trip has tickets. They will be deleted too.";
+    }
+    
+    auto reply = QMessageBox::question(this, "Confirm Delete", confirmMsg);
     if (reply == QMessageBox::Yes) {
+        // Remove tickets for this trip
+        auto itTickets = std::remove_if(tickets.begin(), tickets.end(),
+            [&](const Ticket& t){ return t.getTripId() == targetId; });
+        tickets.erase(itTickets, tickets.end());
+        
+        // Delete trip ticket file
+        std::string tPath = "Data/Ticket/" + targetId + ".txt";
+        if (fs::exists(tPath)) fs::remove(tPath);
+        
+        // Remove trip from Trip.txt
         trips.erase(std::remove_if(trips.begin(), trips.end(),
-            [&](const Trip& t){ return t.getId() == tripId.toStdString(); }), trips.end());
+            [&](const Trip& t){ return t.getId() == targetId; }), trips.end());
         Ultil<Trip>::saveToFile("Data/Trip.txt", trips);
         populateTripsTable();
     }
