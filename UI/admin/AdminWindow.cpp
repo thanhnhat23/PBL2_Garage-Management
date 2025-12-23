@@ -20,6 +20,7 @@
 #include <QLineEdit>
 #include <QDialogButtonBox>
 #include <QCalendarWidget>
+#include <QButtonGroup>
 #include <QPixmap>
 #include <QFile>
 #include <filesystem>
@@ -2487,15 +2488,31 @@ void AdminWindow::onBookTicketClicked() {
     };
     connect(cbRoute, QOverload<int>::of(&QComboBox::currentIndexChanged), updateTrips);
 
-    QComboBox *cbSeat = new QComboBox(&dialog);
     QLineEdit *txtName = new QLineEdit(&dialog); txtName->setPlaceholderText("Passenger Name");
     QLineEdit *txtPhone = new QLineEdit(&dialog); txtPhone->setPlaceholderText("Phone Number");
     QComboBox *cbPayment = new QComboBox(&dialog); cbPayment->addItems({"Cash", "Momo", "ZaloPay", "Bank Transfer"});
-    QLabel *lblPrice = new QLabel("Price: 0 VND", &dialog); lblPrice->setStyleSheet("font-weight: bold; color: #FDB515;");
-
+    QLabel *lblPrice = new QLabel("Total: 0 VND", &dialog); lblPrice->setStyleSheet("font-size: 16px; font-weight: bold; color: #22c55e; padding: 3px;");
+    
+    // Seat grid
+    QWidget *seatWidget = new QWidget(&dialog);
+    QGridLayout *seatGrid = new QGridLayout(seatWidget);
+    seatGrid->setSpacing(3);
+    seatGrid->setContentsMargins(0, 0, 0, 0);
+    QButtonGroup *seatGroup = new QButtonGroup(&dialog);
+    seatGroup->setExclusive(false);
+    std::set<int> selectedSeats;
+    
     auto updateSeatsAndPrice = [&]() {
-        cbSeat->clear();
-        lblPrice->setText("Price: 0 VND");
+        // Clear old buttons
+        QLayoutItem *child;
+        while ((child = seatGrid->takeAt(0)) != nullptr) {
+            delete child->widget();
+            delete child;
+        }
+        selectedSeats.clear();
+        lblPrice->setText("Total: 0 VND");
+        lblPrice->setProperty("price", QVariant::fromValue(0ULL));
+        
         if (cbTrip->count() == 0) return;
 
         QString tripId = cbTrip->currentData().toString();
@@ -2510,7 +2527,7 @@ void AdminWindow::onBookTicketClicked() {
             if (bus.getId() == busId) { capacity = bus.getCapacity(); break; }
         }
 
-        if (capacity == 0) { cbSeat->addItem("No Bus Found", -1); return; }
+        if (capacity == 0) return;
 
         std::set<int> booked;
         for (const auto& tk : tickets) {
@@ -2520,29 +2537,40 @@ void AdminWindow::onBookTicketClicked() {
             }
         }
 
-        bool anySeat = false;
-        for (int seatNo = 1; seatNo <= capacity; ++seatNo) {
-            if (booked.count(seatNo) == 0) {
-                cbSeat->addItem(QString("Seat %1").arg(seatNo), seatNo);
-                anySeat = true;
-            }
-        }
-        if (!anySeat) cbSeat->addItem("Sold Out", -1);
-
-        unsigned long price = 0;
+        unsigned long singlePrice = 0;
         QString routeId = cbRoute->currentData().toString();
         for (const auto& route : routes) {
             if (route.getId() == routeId.toStdString()) {
-                try { price = FareCalculator::calculate(std::stol(route.getDistance())); } 
-                catch (...) { price = FareCalculator::MIN_FARE; }
+                try { singlePrice = FareCalculator::calculate(std::stol(route.getDistance())); } 
+                catch (...) { singlePrice = FareCalculator::MIN_FARE; }
                 break;
             }
         }
-        QString priceStr = QString::number(price);
-        int len = priceStr.length();
-        for (int i = len - 3; i > 0; i -= 3) priceStr.insert(i, ',');
-        lblPrice->setText("Price: " + priceStr + " VND");
-        lblPrice->setProperty("price", QVariant::fromValue(static_cast<qulonglong>(price)));
+        lblPrice->setProperty("singlePrice", QVariant::fromValue(static_cast<qulonglong>(singlePrice)));
+
+        int cols = 8;
+        for (int i = 1; i <= capacity; i++) {
+            QPushButton *btn = new QPushButton(QString::number(i), seatWidget);
+            btn->setCheckable(true);
+            btn->setFixedSize(35, 35);
+            bool isBooked = booked.count(i) > 0;
+            if (isBooked) {
+                btn->setEnabled(false);
+                btn->setStyleSheet("QPushButton { background: #dc2626; color: #fff; border: 1px solid #991b1b; border-radius: 4px; font-weight: 600; font-size: 11px; }");
+            } else {
+                btn->setStyleSheet("QPushButton { background: #1f2937; color: #e5e7eb; border: 1px solid #334155; border-radius: 4px; font-size: 11px; } QPushButton:checked { background: #2563eb; color: #f8fafc; font-weight: 700; }");
+                connect(btn, &QPushButton::toggled, [&, i, singlePrice](bool checked) {
+                    if (checked) { selectedSeats.insert(i); } else { selectedSeats.erase(i); }
+                    unsigned long totalPrice = selectedSeats.size() * singlePrice;
+                    QString priceStr = QString::number(totalPrice);
+                    for (int j = priceStr.length() - 3; j > 0; j -= 3) priceStr.insert(j, ',');
+                    lblPrice->setText("Total: " + priceStr + " VND");
+                    lblPrice->setProperty("price", QVariant::fromValue(static_cast<qulonglong>(totalPrice)));
+                });
+            }
+            int r = (i - 1) / cols, c = (i - 1) % cols;
+            seatGrid->addWidget(btn, r, c);
+        }
     };
 
     connect(cbTrip, QOverload<int>::of(&QComboBox::currentIndexChanged), updateSeatsAndPrice);
@@ -2551,16 +2579,18 @@ void AdminWindow::onBookTicketClicked() {
     formLayout->addRow("Select Route:", cbRoute);
     formLayout->addRow("Select Trip:", cbTrip);
     formLayout->addRow("Date:", calTrip);
-    formLayout->addRow("Seat:", cbSeat);
     formLayout->addRow("Passenger:", txtName);
     formLayout->addRow("Phone:", txtPhone);
     formLayout->addRow("Payment:", cbPayment);
-    formLayout->addRow("", lblPrice);
+    
+    mainLayout->addLayout(formLayout);
+    mainLayout->addWidget(new QLabel("Select Seats:", &dialog));
+    mainLayout->addWidget(seatWidget);
+    mainLayout->addWidget(lblPrice);
     
     QDialogButtonBox *btnBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
     connect(btnBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(btnBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    mainLayout->addLayout(formLayout);
     mainLayout->addWidget(btnBox);
     
     if (dialog.exec() == QDialog::Accepted) {
@@ -2573,28 +2603,31 @@ void AdminWindow::onBookTicketClicked() {
         if (txtName->text().isEmpty() || txtPhone->text().isEmpty()) {
             QMessageBox::warning(this, "Error", "Please enter passenger name and phone number!"); return;
         }
-        if (cbSeat->currentData().toInt() == -1) {
-            QMessageBox::warning(this, "Error", "Selected trip is full or no seat selected!"); return;
+        if (selectedSeats.empty()) {
+            QMessageBox::warning(this, "Error", "Please select at least one seat!"); return;
         }
     
         std::string tripId = cbTrip->currentData().toString().toStdString();
         std::string ticketPath = "Data/Ticket/" + tripId + ".txt";
 
+        // Find max ticket ID in THIS file only
         int maxTicketNum = 0;
-        for(const auto& t : tickets) {
-             std::string id = t.getId();
-             if (id.length() > 2 && id.substr(0,2) == "TK") {
-                 try { 
-                     int n = std::stoi(id.substr(2)); 
-                     if(n > maxTicketNum) maxTicketNum = n; 
-                 } catch(...) {}
+        {
+            std::ifstream inFile(ticketPath);
+            std::string line;
+            while (std::getline(inFile, line)) {
+                if (line.empty()) continue;
+                try {
+                    Ticket t = Ticket::fromCSV(line);
+                    std::string id = t.getId();
+                    if (id.length() > 2 && id.substr(0, 2) == "TK") {
+                        int n = std::stoi(id.substr(2));
+                        if (n > maxTicketNum) maxTicketNum = n;
+                    }
+                } catch(...) {}
             }
         }
         
-        int nextTicketNum = maxTicketNum + 1;
-        std::stringstream tkSs;
-        tkSs << "TK" << std::setw(3) << std::setfill('0') << nextTicketNum;
-        std::string ticketId = tkSs.str();
         std::string busId;
         for (const auto& trip : trips) {
             if (trip.getId() == tripId) {
@@ -2603,8 +2636,7 @@ void AdminWindow::onBookTicketClicked() {
             }
         }
         
-        int seatNo = cbSeat->currentData().toInt();
-        unsigned long ticketPrice = lblPrice->property("price").toULongLong();
+        unsigned long singlePrice = lblPrice->property("singlePrice").toULongLong();
         
         auto now = std::chrono::system_clock::now();
         auto time = std::chrono::system_clock::to_time_t(now);
@@ -2612,19 +2644,7 @@ void AdminWindow::onBookTicketClicked() {
         std::strftime(timebuf, sizeof(timebuf), "%H:%M:%S", std::localtime(&time));
         std::string bookedAt = calTrip->selectedDate().toString("yyyy-MM-dd").toStdString() + " " + timebuf;
         
-        Ticket newTicket(
-            ticketId,
-            tripId,
-            busId,
-            seatNo,
-            txtName->text().toStdString(),
-            txtPhone->text().toStdString(),
-            ticketPrice,
-            bookedAt,
-            cbPayment->currentText().toStdString()
-        );
-        tickets.push_back(newTicket);
-
+        // Save all selected seats
         {
             std::fstream out(ticketPath, std::ios::in | std::ios::out | std::ios::app);
             if (!out.is_open()) {
@@ -2638,12 +2658,33 @@ void AdminWindow::onBookTicketClicked() {
                 char last; out.get(last);
                 if (last != '\n') out << '\n';
             }
-            out << newTicket.toCSV() << "\n";
+            
+            for (int seatNo : selectedSeats) {
+                maxTicketNum++;
+                std::stringstream tkSs;
+                tkSs << "TK" << std::setw(3) << std::setfill('0') << maxTicketNum;
+                std::string ticketId = tkSs.str();
+                
+                Ticket newTicket(
+                    ticketId,
+                    tripId,
+                    busId,
+                    seatNo,
+                    txtName->text().toStdString(),
+                    txtPhone->text().toStdString(),
+                    singlePrice,
+                    bookedAt,
+                    cbPayment->currentText().toStdString()
+                );
+                tickets.push_back(newTicket);
+                out << newTicket.toCSV() << "\n";
+            }
             out.close();
         }
 
+        unsigned long totalPrice = selectedSeats.size() * singlePrice;
         QMessageBox::information(this, "Success", 
-            QString("Ticket booked successfully!\nTicket ID: %1").arg(QString::fromStdString(ticketId)));
+            QString("Booked %1 tickets successfully!\nTotal: %2 VND").arg(selectedSeats.size()).arg(totalPrice));
         loadAllData();
         populateTicketsTable();
     }
