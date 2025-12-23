@@ -431,23 +431,34 @@ void UserWindow::onBookTicketClicked() {
     if (inputPhone.isEmpty()){ QMessageBox::warning(this,"Book Ticket","Please enter phone number"); return; }
     if (selectedSeats.empty()){ QMessageBox::warning(this,"Book Ticket","Please select at least one seat"); return; }
     
-    std::string ticketPath = "Data/Ticket/" + tripId.toStdString() + ".txt";
+    // Determine file based on trip ID: T005 -> T005.txt (NOT TK005.txt!)
+    std::string fileId = tripId.toStdString();
+    std::string path = std::string("Data/Ticket/") + fileId + ".txt";
+    
+    // Find max ticket ID in THIS file only
     int maxTkNum = 0;
-    for (const auto& t : tickets) {
-        std::string id = t.getId();
-        if (id.length() > 2 && id.substr(0, 2) == "TK") {
+    {
+        std::ifstream in(path);
+        std::string ln;
+        while (std::getline(in, ln)) {
+            if (ln.empty()) continue;
             try {
-                int num = std::stoi(id.substr(2));
-                if (num > maxTkNum) maxTkNum = num;
+                Ticket t = Ticket::fromCSV(ln);
+                std::string id = t.getId();
+                if (id.length() > 2 && id.substr(0, 2) == "TK") {
+                    int num = std::stoi(id.substr(2));
+                    if (num > maxTkNum) maxTkNum = num;
+                }
             } catch(...) {}
         }
     }
 
-    std::ofstream out(ticketPath, std::ios::app);
+    std::string nameStr = inputName.toStdString();
+    std::string phoneStr = inputPhone.toStdString();
+    std::string payStr = pay.toStdString();
     std::string bookedAtStr = (dateStr + " 00:00").toStdString();
     
     try {
-        std::string path = std::string("Data/Ticket/") + fileId + ".txt";
 
         // Append all selected seats as separate tickets
         {
@@ -470,11 +481,29 @@ void UserWindow::onBookTicketClicked() {
                 int row = myTicketsTable->rowCount();
                 myTicketsTable->insertRow(row);
                 myTicketsTable->setItem(row,0,new QTableWidgetItem(QString::fromStdString(tk.getId())));
-                myTicketsTable->setItem(row,1,new QTableWidgetItem(QString::fromStdString(tk.getTripId())));
+                // Format Trip as Start - End
+                QString tripDisplay = QString::fromStdString(tk.getTripId());
+                for (const auto &tr : trips) {
+                    if (tr.getId() == tk.getTripId()) {
+                        for (const auto &rt : routes) {
+                            if (rt.getId() == tr.getRouteId()) {
+                                tripDisplay = QString::fromStdString(rt.getStart() + " - " + rt.getEnd());
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                myTicketsTable->setItem(row,1,new QTableWidgetItem(tripDisplay));
                 myTicketsTable->setItem(row,2,new QTableWidgetItem(QString::number(tk.getSeatNo())));
                 myTicketsTable->setItem(row,3,new QTableWidgetItem(QString::fromStdString(tk.getPassengerName())));
                 myTicketsTable->setItem(row,4,new QTableWidgetItem(QString::fromStdString(tk.getPhoneNumber())));
-                myTicketsTable->setItem(row,5,new QTableWidgetItem(QString::number(tk.getPrice())));
+                {
+                    QString s = QString::number(tk.getPrice());
+                    for (int i=s.length()-3;i>0;i-=3) s.insert(i, '.');
+                    s += "vnd";
+                    myTicketsTable->setItem(row,5,new QTableWidgetItem(s));
+                }
                 myTicketsTable->setItem(row,6,new QTableWidgetItem(QString::fromStdString(tk.getBookedAt())));
             }
             out.close();
