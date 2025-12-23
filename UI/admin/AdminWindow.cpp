@@ -1057,8 +1057,8 @@ void AdminWindow::loadTicketsData() {
     ticketsByFile.clear();
     ticketFileOrder.clear();
     std::string line;
-    for (int i = 1; i <= 100; i++) {
-        std::string fileId = "TK" + std::string(3 - std::to_string(i).length(), '0') + std::to_string(i);
+    for (const auto& trip : trips) {
+        std::string fileId = trip.getId();
         std::string filename = "Data/Ticket/" + fileId + ".txt";
         if (!fs::exists(filename)) continue;
 
@@ -2553,32 +2553,23 @@ void AdminWindow::onBookTicketClicked() {
         }
     
         std::string tripId = cbTrip->currentData().toString().toStdString();
-        std::string fileId = "TK" + tripId.substr(1);
-        std::string ticketPath = "Data/Ticket/" + fileId + ".txt";
+        std::string ticketPath = "Data/Ticket/" + tripId + ".txt";
 
         int maxTicketNum = 0;
-        {
-            std::ifstream in(ticketPath);
-            std::string ln;
-            while (std::getline(in, ln)) {
-                if (ln.empty()) continue;
-                try {
-                    Ticket t = Ticket::fromCSV(ln);
-                    std::string id = t.getId();
-                    if (id.rfind("TK", 0) == 0) {
-                        try {
-                            int num = std::stoi(id.substr(2));
-                            if (num > maxTicketNum) maxTicketNum = num;
-                        } catch (...) {}
-                    }
-                } catch (...) {}
+        for(const auto& t : tickets) {
+             std::string id = t.getId();
+             if (id.length() > 2 && id.substr(0,2) == "TK") {
+                 try { 
+                     int n = std::stoi(id.substr(2)); 
+                     if(n > maxTicketNum) maxTicketNum = n; 
+                 } catch(...) {}
             }
         }
+        
         int nextTicketNum = maxTicketNum + 1;
         std::stringstream tkSs;
         tkSs << "TK" << std::setw(3) << std::setfill('0') << nextTicketNum;
         std::string ticketId = tkSs.str();
-
         std::string busId;
         for (const auto& trip : trips) {
             if (trip.getId() == tripId) {
@@ -2676,45 +2667,35 @@ void AdminWindow::onCancelTicketClicked() {
         std::string busId = itTicket->getBusId();
         std::string ticketId = itTicket->getId();
         std::string tripId = itTicket->getTripId();
-        
-        // Remove ticket from vector
         tickets.erase(tickets.begin() + ticketIndex);
+        std::string filepath = "Data/Ticket/" + tripId + ".txt"; 
         
-        // Find the ticket file (tickets are grouped by some criteria in files)
-        // Read all ticket files and rewrite the one that contains this ticket
-        std::string ticketDir = "Data/Ticket/";
-        for (const auto& entry : fs::directory_iterator(ticketDir)) {
-            if (entry.is_regular_file()) {
-                std::string filepath = entry.path().string();
-                
-                // Read all tickets from this file
-                std::vector<Ticket> fileTickets;
-                std::ifstream file(filepath);
-                std::string line;
-                bool foundTicket = false;
-                
-                while (std::getline(file, line)) {
+        if (fs::exists(filepath)) {
+            std::vector<Ticket> fileTickets;
+            std::ifstream file(filepath);
+            std::string line;
+            bool foundTicket = false;
+            
+            while (std::getline(file, line)) {
+                if (line.empty()) continue;
+                try {
                     Ticket t = Ticket::fromCSV(line);
                     if (t.getId() == ticketId) {
                         foundTicket = true;
-                        // Skip this ticket 
                     } else {
                         fileTickets.push_back(t);
                     }
+                } catch(...) {}
+            }
+            file.close();
+
+            if (foundTicket) {
+                if (fileTickets.empty()) {
+                    std::remove(filepath.c_str());
+                } else {
+                    Ultil<Ticket>::saveToFile(filepath, fileTickets);
                 }
-                file.close();
-                
-                // If found, rewrite the file without the deleted ticket
-                if (foundTicket) {
-                    if (fileTickets.empty()) {
-                        // If no tickets left, delete the file
-                        std::remove(filepath.c_str());
-                    } else {
-                        // Rewrite file with remaining tickets
-                        Ultil<Ticket>::saveToFile(filepath, fileTickets);
-                    }
-                    break;
-                }
+                ticketsByFile[tripId] = fileTickets; 
             }
         }
         
