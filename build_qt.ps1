@@ -4,7 +4,9 @@
 Write-Host "Building Qt Project..." -ForegroundColor Green
 
 $qtPaths = @(
-    "D:\Qt\6.10.1\mingw_64\bin"
+    "D:\install\QT\6.10.1\mingw_64\bin", #Tnhat
+    "D:\Qt\6.10.1\mingw_64\bin",  #Truon 
+    "C:\Qt\6.10.1\mingw_64\bin"
 )
 $qtPath = $null
 foreach ($path in $qtPaths) {

@@ -30,7 +30,9 @@ User User::fromCSV(const std::string& line) {
     if (!std::getline(ss, uname, ',')) return User();
     if (!std::getline(ss, pwd, ',')) return User();
     if (!std::getline(ss, r, ',')) return User();
-    if (std::getline(ss, phone, ',')) {
+    // Phone is last field - read until end of line, no delimiter
+    if (std::getline(ss, phone)) {
+        // Remove trailing \r if present (from CRLF line endings)
         if (!phone.empty() && phone.back() == '\r') phone.pop_back();
     } else {
         phone = "";

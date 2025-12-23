@@ -564,30 +564,111 @@ void UserWindow::onCancelMyTicketClicked() {
     auto items = myTicketsTable->selectedItems();
     if (items.isEmpty()) return;
     int row = items.first()->row();
-    std::string id = myTicketsTable->item(row,0)->text().toStdString();
-    auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
-    if(it == tickets.end()) return;
-    std::string tripId = it->getTripId(); 
-    tickets.erase(it);
-    if(tripId.length() > 0) {
-        std::string path = "Data/Ticket/" + tripId + ".txt";
+    
+    // Get phone from table directly (column 4 is phone)
+    std::string selectedPhone = myTicketsTable->item(row, 4)->text().toStdString();
+    std::string userPhone = currentUser.getPhoneNumber();
+    
+    // Trim both for comparison
+    auto trim = [](const std::string& s) {
+        auto start = s.find_first_not_of(" \t\r\n");
+        auto end = s.find_last_not_of(" \t\r\n");
+        return (start == std::string::npos) ? "" : s.substr(start, end - start + 1);
+    };
+    
+    selectedPhone = trim(selectedPhone);
+    userPhone = trim(userPhone);
+    
+    // Check ownership
+    if(selectedPhone != userPhone) {
+        QMessageBox::warning(this, "Error", 
+            QString("This ticket doesn't belong to you!\nTicket Phone: %1\nYour Phone: %2")
+                .arg(QString::fromStdString(selectedPhone))
+                .arg(QString::fromStdString(userPhone)));
+        return;
+    }
+    
+    std::string id = myTicketsTable->item(row, 0)->text().toStdString();
+    std::string tripId = myTicketsTable->item(row, 1)->text().toStdString();
+    
+    // Debug: Find actual trip ID from trips list (display shows "Start - End", not trip ID)
+    std::string actualTripId = "";
+    for (const auto& tr : trips) {
+        for (const auto& rt : routes) {
+            if (rt.getId() == tr.getRouteId()) {
+                std::string display = rt.getStart() + " - " + rt.getEnd();
+                if (display == tripId) {
+                    actualTripId = tr.getId();
+                    break;
+                }
+            }
+        }
+        if (!actualTripId.empty()) break;
+    }
+    
+    // If we couldn't find trip by display, search by ticket ID in memory
+    if (actualTripId.empty()) {
+        auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
+        if (it == tickets.end()) {
+            QMessageBox::warning(this, "Error", "Ticket not found!");
+            return;
+        }
+        actualTripId = it->getTripId();
+        tickets.erase(it);
+    } else {
+        // Also remove from memory
+        auto it = std::find_if(tickets.begin(), tickets.end(), [&](const Ticket& t){ return t.getId() == id; });
+        if (it != tickets.end()) {
+            tickets.erase(it);
+        }
+    }
+    
+    // Delete from file
+    if(actualTripId.length() > 0) {
+        std::string path = "Data/Ticket/" + actualTripId + ".txt";
+        
+        // Check if file exists
+        std::ifstream test(path);
+        if (!test.good()) {
+            test.close();
+            QMessageBox::warning(this, "Error", QString("File not found: %1").arg(QString::fromStdString(path)));
+            populateMyTickets();
+            return;
+        }
+        test.close();
+        
+        // Read and filter out the ticket
         std::vector<std::string> lines;
         std::ifstream in(path); 
         std::string ln;
+        bool found = false;
         while(std::getline(in, ln)) {
             if(ln.empty()) continue;
             try {
                 Ticket t = Ticket::fromCSV(ln);
-                if(t.getId() != id) lines.push_back(ln);
-            } catch(...) { lines.push_back(ln); }
+                if(t.getId() == id) {
+                    found = true;
+                    continue; // Skip this line (delete it)
+                }
+                lines.push_back(ln);
+            } catch(...) { 
+                lines.push_back(ln); 
+            }
         }
         in.close();
+        
+        // Write back to file
         std::ofstream out(path, std::ios::trunc);
         for(const auto &l : lines) out << l << "\n";
         out.close();
+        
+        if (!found) {
+            QMessageBox::warning(this, "Warning", "Ticket ID not found in file!");
+        }
     }
+    
     populateMyTickets();
-    QMessageBox::information(this, "Success", "Ticket cancelled");
+    QMessageBox::information(this, "Success", "Ticket cancelled successfully!");
 }
 
 void UserWindow::onLogoutClicked() {
